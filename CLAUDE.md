@@ -18,7 +18,7 @@
 ```
 用戶 LINE
   ↓ Webhook
-Vercel (Next.js)  ←── 目前用 Cloudflare Tunnel 測試
+Vercel (Next.js)  https://ding-wifi-gate.vercel.app
   ↓ MQTT Publish
 HiveMQ Cloud (免費 Serverless Cluster)
   ↓ MQTT Push
@@ -36,15 +36,11 @@ GPIO 2（目前接板載 LED 模擬，之後換繼電器）
 - [x] Next.js API Route `POST /api/garage`（直接發 MQTT，測試用）
 - [x] Next.js LINE Webhook `POST /api/webhook`（驗證簽名、解析指令、發 MQTT、回覆用戶）
 - [x] LINE Bot 傳「開門/關門/停」→ ESP32 LED 閃動（全鏈路驗證成功）
+- [x] 部署 Vercel（`https://ding-wifi-gate.vercel.app/api/webhook`），LINE Webhook 驗證成功
 
 ## 待辦事項
 
-1. **部署 Vercel**
-   - `git push` 到 GitHub，連結 Vercel 自動部署
-   - 在 Vercel 環境變數填入 `.env.local` 的所有值
-   - 更新 LINE Developers 的 Webhook URL 為 Vercel 網址
-
-2. **購買並接繼電器**
+1. **購買並接繼電器**
    - 買「4 路 5V 繼電器模組」
    - 將 ESP32 GPIO 控制腳位接繼電器，繼電器另一端接捲門衛士原來的 4 條線
    - 修改 `firmware/main/main.ino`：把 LED 動作換成對應 GPIO 點動 0.5 秒
