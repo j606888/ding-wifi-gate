@@ -13,22 +13,30 @@ const char* MQTT_USER     = "j606888";
 const char* MQTT_PASS     = "gVXExs!v8BF3PdD";
 const char* MQTT_TOPIC    = "home/garage";
 
-const int LED_PIN = 2;
+const int PIN_OPEN  = 26;
+const int PIN_CLOSE = 27;
+const int PIN_STOP  = 14;
 
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
+
+void triggerRelay(int pin) {
+  digitalWrite(pin, LOW);   // Active LOW：拉低觸發繼電器
+  delay(500);
+  digitalWrite(pin, HIGH);  // 放開
+}
 
 void onMessage(char* topic, byte* payload, unsigned int length) {
   String msg = "";
   for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
   Serial.println("收到訊息: " + msg);
 
-  if (msg == "open" || msg == "close" || msg == "stop") {
-    digitalWrite(LED_PIN, HIGH);
-    delay(500);
-    digitalWrite(LED_PIN, LOW);
-    Serial.println("動作執行完畢");
-  }
+  if      (msg == "open")  triggerRelay(PIN_OPEN);
+  else if (msg == "close") triggerRelay(PIN_CLOSE);
+  else if (msg == "stop")  triggerRelay(PIN_STOP);
+  else return;
+
+  Serial.println("動作執行完畢");
 }
 
 void connectMQTT() {
@@ -47,8 +55,6 @@ void connectMQTT() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("連線 Wi-Fi");
@@ -58,7 +64,11 @@ void setup() {
   }
   Serial.println("\nIP: " + WiFi.localIP().toString());
 
-  wifiClient.setInsecure(); // 略過 TLS 憑證驗證（測試用）
+  pinMode(PIN_OPEN,  OUTPUT); digitalWrite(PIN_OPEN,  HIGH);
+  pinMode(PIN_CLOSE, OUTPUT); digitalWrite(PIN_CLOSE, HIGH);
+  pinMode(PIN_STOP,  OUTPUT); digitalWrite(PIN_STOP,  HIGH);
+
+  wifiClient.setInsecure();
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
   mqttClient.setCallback(onMessage);
 
