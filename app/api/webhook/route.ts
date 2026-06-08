@@ -9,7 +9,6 @@ const MQTT_URL = `mqtts://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`;
 const TOPIC = process.env.MQTT_TOPIC!;
 
 const COMMAND_MAP: Record<string, string> = {
-  打開: "open",
   開門: "open",
   開: "open",
   關門: "close",
@@ -19,7 +18,6 @@ const COMMAND_MAP: Record<string, string> = {
 };
 
 const LABEL_MAP: Record<string, string> = {
-  打開: "打開",
   開門: "開門",
   開: "開門",
   關門: "關門",
