@@ -32,6 +32,17 @@ const ACTION_LABEL: Record<string, string> = {
   stop: "停止",
 };
 
+
+async function notifyDiscord(displayName: string, action: string): Promise<void> {
+  const url = process.env.DISCORD_WEBHOOK_URL;
+  if (!url) return;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: `${displayName} ${ACTION_LABEL[action] ?? action}` }),
+  });
+}
+
 async function getLineProfile(
   lineUserId: string
 ): Promise<{ displayName: string }> {
@@ -225,6 +236,7 @@ export async function POST(req: NextRequest) {
       await publishMQTT(action);
       await logAccess(lineUserId, displayName, action, "success");
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
+      notifyDiscord(displayName, action).catch(() => {});
     } catch {
       await replyMessage(event.replyToken, "發送失敗，請稍後再試");
     }
