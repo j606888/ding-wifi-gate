@@ -114,7 +114,7 @@ export default function AdminClient() {
   }
 
   const inputCls =
-    "w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
+    "w-full min-w-0 appearance-none rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-base text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50";
 
   return (
     <div className="min-h-full bg-zinc-100 px-4 py-8 dark:bg-zinc-950">
@@ -139,6 +139,7 @@ export default function AdminClient() {
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <input
+                type="tel"
                 inputMode="numeric"
                 maxLength={6}
                 value={code}

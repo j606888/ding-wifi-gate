@@ -169,6 +169,14 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    if (text === "後台" || text.toLowerCase() === "admin") {
+      await replyMessage(
+        event.replyToken,
+        "https://ding-wifi-gate.vercel.app/admin"
+      );
+      continue;
+    }
+
     if (!action) {
       await replyMessage(
         event.replyToken,

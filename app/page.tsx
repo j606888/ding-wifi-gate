@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 type Stage = "input" | "opened" | "closed";
 
@@ -67,9 +68,17 @@ export default function DoorPage() {
     <div className="flex min-h-full flex-1 items-center justify-center bg-zinc-100 px-6 py-12 dark:bg-zinc-950">
       <main className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-xl shadow-zinc-200/60 dark:bg-zinc-900 dark:shadow-black/40">
         <div className="mb-8 text-center">
-          <div className="mb-3 text-5xl">🚪</div>
+          <Image
+            src="/house.jpg"
+            alt="丁宅大門"
+            width={4032}
+            height={2268}
+            priority
+            sizes="(max-width: 640px) 100vw, 384px"
+            className="mb-4 h-auto w-full rounded-2xl"
+          />
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-            鐵捲門
+            丁宅鐵捲門
           </h1>
         </div>
 
@@ -79,6 +88,7 @@ export default function DoorPage() {
               請輸入密碼開門
             </p>
             <input
+              type="tel"
               inputMode="numeric"
               autoFocus
               maxLength={6}
