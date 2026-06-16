@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as crypto from "crypto";
-import mqtt from "mqtt";
 import { supabase } from "@/lib/supabase";
+import { publishMQTT } from "@/lib/mqtt";
+import { ACTION_LABEL, logAccess, notifyDiscord } from "@/lib/access";
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET!;
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN!;
-const MQTT_URL = `mqtts://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`;
-const TOPIC = process.env.MQTT_TOPIC!;
 
 const COMMAND_MAP: Record<string, string> = {
   開門: "open",
@@ -25,23 +24,6 @@ const LABEL_MAP: Record<string, string> = {
   停止: "停止",
   停: "停止",
 };
-
-const ACTION_LABEL: Record<string, string> = {
-  open: "開門",
-  close: "關門",
-  stop: "停止",
-};
-
-
-async function notifyDiscord(displayName: string, action: string): Promise<void> {
-  const url = process.env.DISCORD_WEBHOOK_URL;
-  if (!url) return;
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: `${displayName} ${ACTION_LABEL[action] ?? action}` }),
-  });
-}
 
 async function getLineProfile(
   lineUserId: string
@@ -76,20 +58,6 @@ async function getOrCreateUser(lineUserId: string): Promise<{
     is_active: false,
   });
   return { displayName, is_active: false, isNew: true };
-}
-
-async function logAccess(
-  lineUserId: string,
-  displayName: string,
-  action: string,
-  status: "success" | "denied"
-): Promise<void> {
-  await supabase.from("access_logs").insert({
-    line_user_id: lineUserId,
-    display_name: displayName,
-    action,
-    status,
-  });
 }
 
 function formatAccessTime(isoString: string): string {
@@ -127,23 +95,6 @@ function verifySignature(body: string, signature: string): boolean {
     .update(body)
     .digest("base64");
   return hash === signature;
-}
-
-async function publishMQTT(action: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const client = mqtt.connect(MQTT_URL, {
-      username: process.env.MQTT_USERNAME,
-      password: process.env.MQTT_PASSWORD,
-      rejectUnauthorized: false,
-    });
-    client.on("connect", () => {
-      client.publish(TOPIC, action, { qos: 1 }, (err) => {
-        client.end();
-        err ? reject(err) : resolve();
-      });
-    });
-    client.on("error", reject);
-  });
 }
 
 async function replyMessage(replyToken: string, text: string): Promise<void> {
@@ -227,14 +178,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!is_active) {
-      await logAccess(lineUserId, displayName, action, "denied");
+      await logAccess({ lineUserId, displayName, action, status: "denied" });
       await replyMessage(event.replyToken, "你沒有使用權限，請聯絡管理員。");
       continue;
     }
 
     try {
       await publishMQTT(action);
-      await logAccess(lineUserId, displayName, action, "success");
+      await logAccess({ lineUserId, displayName, action, status: "success" });
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
       notifyDiscord(displayName, action).catch(() => {});
     } catch {
