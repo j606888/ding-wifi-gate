@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import * as crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
       await publishMQTT(action);
       await logAccess({ lineUserId, displayName, action, status: "success" });
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
-      notifyBark(displayName, action).catch(() => {});
+      after(() => notifyBark(displayName, action).catch(() => {}));
     } catch {
       await replyMessage(event.replyToken, "發送失敗，請稍後再試");
     }
