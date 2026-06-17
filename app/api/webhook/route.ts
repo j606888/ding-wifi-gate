@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
-import { ACTION_LABEL, logAccess, notifyDiscord } from "@/lib/access";
+import { ACTION_LABEL, logAccess, notifyBark } from "@/lib/access";
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET!;
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN!;
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
       await publishMQTT(action);
       await logAccess({ lineUserId, displayName, action, status: "success" });
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
-      notifyDiscord(displayName, action).catch(() => {});
+      notifyBark(displayName, action).catch(() => {});
     } catch {
       await replyMessage(event.replyToken, "發送失敗，請稍後再試");
     }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
-import { logAccess, notifyDiscord } from "@/lib/access";
+import { logAccess, notifyBark } from "@/lib/access";
 import { signToken } from "@/lib/auth";
 
 const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 分鐘
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     source: "web",
     codeId: codeRow.id,
   });
-  notifyDiscord(`🔑 ${codeRow.label}`, "open").catch(() => {});
+  notifyBark(`🔑 ${codeRow.label}`, "open").catch(() => {});
 
   // 關門 token：min(30 分, 密碼到期時間)
   const validUntilMs = new Date(codeRow.valid_until).getTime();

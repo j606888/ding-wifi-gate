@@ -26,17 +26,21 @@ export async function logAccess(params: LogAccessParams): Promise<void> {
   });
 }
 
-export async function notifyDiscord(
+export async function notifyBark(
   displayName: string,
   action: string
 ): Promise<void> {
-  const url = process.env.DISCORD_WEBHOOK_URL;
-  if (!url) return;
-  await fetch(url, {
+  const key = process.env.BARK_KEY;
+  if (!key) return;
+  const server = process.env.BARK_SERVER ?? "https://api.day.app";
+  await fetch(`${server}/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      content: `${displayName} ${ACTION_LABEL[action] ?? action}`,
+      device_key: key,
+      title: "鐵捲門",
+      body: `${displayName} ${ACTION_LABEL[action] ?? action}`,
+      group: "garage",
     }),
   });
 }

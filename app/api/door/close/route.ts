@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishMQTT } from "@/lib/mqtt";
-import { logAccess, notifyDiscord } from "@/lib/access";
+import { logAccess, notifyBark } from "@/lib/access";
 import { verifyToken } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     source: "web",
     codeId,
   });
-  notifyDiscord(`🔑 ${label}`, "close").catch(() => {});
+  notifyBark(`🔑 ${label}`, "close").catch(() => {});
 
   return NextResponse.json({ status: "ok" });
 }

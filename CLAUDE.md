@@ -44,7 +44,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - [x] 權限管理：新用戶自動建立帳號，管理員手動開通 `is_active`
 - [x] LINE Rich Menu：快速開門/關門/停止按鈕
 - [x] 「誰來了」指令：顯示最新 5 筆開門紀錄（相對時間格式）
-- [x] 密碼網頁開門：訪客在 `/` 輸入 6 位數密碼開門、顯示關門按鈕；管理員後台 `/admin` 設定密碼（標籤＋可用時間區間）並看使用次數。紀錄整合進「誰來了」＋ Discord
+- [x] 密碼網頁開門：訪客在 `/` 輸入 6 位數密碼開門、顯示關門按鈕；管理員後台 `/admin` 設定密碼（標籤＋可用時間區間）並看使用次數。紀錄整合進「誰來了」＋ Bark 推播
 
 ## 待辦事項
 
@@ -76,6 +76,8 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_PASSWORD`（後台 `/admin` 登入密碼）
 - `APP_SECRET`（HMAC 簽章密鑰，用於管理員 cookie ＋ 關門 token）
+- `BARK_KEY`（Bark iOS 推播 Key，門被操作時發推播）
+- `BARK_SERVER`（選填，自架 Bark 伺服器；預設 `https://api.day.app`）
 
 ## 檔案結構
 
@@ -103,7 +105,7 @@ ding-wifi-gate/
 ├── lib/
 │   ├── supabase.ts        # Supabase client
 │   ├── mqtt.ts            # publishMQTT（共用）
-│   ├── access.ts          # logAccess / notifyDiscord / ACTION_LABEL（共用）
+│   ├── access.ts          # logAccess / notifyBark / ACTION_LABEL（共用）
 │   └── auth.ts            # HMAC signToken/verifyToken / requireAdmin
 ├── scripts/
 │   └── schema.sql         # 密碼功能的 Supabase 資料表 DDL
@@ -185,7 +187,7 @@ ding-wifi-gate/
 ## 網頁密碼開門流程
 
 - **公開頁 `/`**：訪客輸入 6 位數密碼 → `POST /api/door/verify`。密碼正確、`is_active`
-  且現在落在區間內 → 發 MQTT `open`、寫 `access_logs`(source=web)、發 Discord，回傳
+  且現在落在區間內 → 發 MQTT `open`、寫 `access_logs`(source=web)、發 Bark 推播，回傳
   短效**關門 token**（HMAC 簽 `code_id`，最長 30 分或到密碼到期）。畫面顯示關門按鈕
   與「記得幫我關門」提醒；按關門 → `POST /api/door/close`（帶 token）發 MQTT `close`。
 - **後台 `/admin`**：用 `ADMIN_PASSWORD` 登入（HMAC 簽章 httpOnly cookie，7 天）。可
