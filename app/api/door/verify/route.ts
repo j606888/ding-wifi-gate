@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
 import { logAccess, notifyBark } from "@/lib/access";
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     source: "web",
     codeId: codeRow.id,
   });
-  after(() => notifyBark(`🔑 ${codeRow.label}`, "open").catch(() => {}));
+  await notifyBark(`🔑 ${codeRow.label}`, "open").catch(() => {});
 
   // 關門 token：min(30 分, 密碼到期時間)
   const validUntilMs = new Date(codeRow.valid_until).getTime();
