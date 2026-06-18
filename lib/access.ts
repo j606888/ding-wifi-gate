@@ -30,17 +30,24 @@ export async function notifyBark(
   displayName: string,
   action: string
 ): Promise<void> {
-  const key = process.env.BARK_KEY;
-  if (!key) return;
+  const keys = (process.env.BARK_KEYS ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (keys.length === 0) return;
   const server = process.env.BARK_SERVER ?? "https://api.day.app";
-  await fetch(`${server}/push`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      device_key: key,
-      title: "鐵捲門",
-      body: `${displayName} ${ACTION_LABEL[action] ?? action}`,
-      group: "garage",
-    }),
-  });
+  const payload = {
+    title: "鐵捲門",
+    body: `${displayName} ${ACTION_LABEL[action] ?? action}`,
+    group: "garage",
+  };
+  await Promise.all(
+    keys.map((key) =>
+      fetch(`${server}/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, device_key: key }),
+      })
+    )
+  );
 }

@@ -76,7 +76,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_PASSWORD`（後台 `/admin` 登入密碼）
 - `APP_SECRET`（HMAC 簽章密鑰，用於管理員 cookie ＋ 關門 token）
-- `BARK_KEY`（Bark iOS 推播 Key，門被操作時發推播）
+- `BARK_KEYS`（Bark iOS 推播 Key，門被操作時發推播；可用逗號分隔多人，例如 `key1,key2`）
 - `BARK_SERVER`（選填，自架 Bark 伺服器；預設 `https://api.day.app`）
 
 ## 檔案結構
