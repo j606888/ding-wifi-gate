@@ -12,6 +12,15 @@ create table if not exists door_codes (
   created_at  timestamptz not null default now()
 );
 
+-- 週期性時段：'once' 用 valid_from/valid_until；'weekly' 用 weekdays + start/end_minute
+alter table door_codes add column if not exists recurrence   text     not null default 'once'; -- 'once' | 'weekly'
+alter table door_codes add column if not exists weekdays     smallint[];   -- JS getDay() 0=日..6=六
+alter table door_codes add column if not exists start_minute smallint;     -- 本地午夜起算分鐘 0-1439
+alter table door_codes add column if not exists end_minute   smallint;
+-- weekly 密碼不用絕對時間區間，放寬為可空
+alter table door_codes alter column valid_from  drop not null;
+alter table door_codes alter column valid_until drop not null;
+
 -- 加速驗證查詢
 create index if not exists door_codes_code_active_idx
   on door_codes (code, is_active);

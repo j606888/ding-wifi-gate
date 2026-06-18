@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
 import { logAccess, notifyBark } from "@/lib/access";
 import { signToken } from "@/lib/auth";
+import { evaluateCode } from "@/lib/schedule";
 
 const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 分鐘
 const RATE_MAX_FAILS = 10; // 同 IP 10 分鐘內最多 10 次失敗
@@ -16,7 +17,6 @@ function clientIp(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
   const now = Date.now();
-  const nowIso = new Date(now).toISOString();
   const ip = clientIp(req);
 
   const { code } = await req.json().catch(() => ({ code: "" }));
@@ -38,17 +38,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 驗證密碼：正確、啟用中、現在落在區間內
-  const { data: codeRow } = await supabase
+  // 驗證密碼：正確、啟用中、現在落在可用時段內（單次或每週，於 JS 判斷）
+  const { data: rows } = await supabase
     .from("door_codes")
-    .select("id, label, valid_until")
+    .select(
+      "id, label, recurrence, weekdays, start_minute, end_minute, valid_from, valid_until"
+    )
     .eq("code", code)
     .eq("is_active", true)
-    .lte("valid_from", nowIso)
-    .gte("valid_until", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
+
+  let codeRow: { id: number; label: string } | null = null;
+  let windowEndMs = 0;
+  for (const row of rows ?? []) {
+    const { valid, windowEndMs: end } = evaluateCode(row, now);
+    if (valid) {
+      codeRow = { id: row.id, label: row.label };
+      windowEndMs = end ?? now;
+      break;
+    }
+  }
 
   if (!codeRow) {
     await supabase.from("door_attempts").insert({ ip });
@@ -74,9 +83,8 @@ export async function POST(req: NextRequest) {
   });
   await notifyBark(`🔑 ${codeRow.label}`, "open").catch(() => {});
 
-  // 關門 token：min(30 分, 密碼到期時間)
-  const validUntilMs = new Date(codeRow.valid_until).getTime();
-  const ttl = Math.max(0, Math.min(CLOSE_TOKEN_TTL_MS, validUntilMs - now));
+  // 關門 token：min(30 分, 本次時段結束時間)
+  const ttl = Math.max(0, Math.min(CLOSE_TOKEN_TTL_MS, windowEndMs - now));
   const token = signToken({ codeId: codeRow.id, label: codeRow.label }, ttl, now);
 
   return NextResponse.json({ status: "ok", label: codeRow.label, token });

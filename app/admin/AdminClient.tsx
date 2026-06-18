@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { WEEKDAY_LABELS } from "@/lib/schedule";
 
 type DoorCode = {
   id: number;
   code: string;
   label: string;
-  valid_from: string;
-  valid_until: string;
+  recurrence: "once" | "weekly";
+  weekdays: number[] | null;
+  start_minute: number | null;
+  end_minute: number | null;
+  valid_from: string | null;
+  valid_until: string | null;
   is_active: boolean;
   usage_count: number;
 };
@@ -18,6 +23,30 @@ function fmt(iso: string): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(
     d.getMinutes()
+  )}`;
+}
+
+// 分鐘數（本地午夜起算）→ "HH:MM"
+function minToHHMM(m: number): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(Math.floor(m / 60))}:${p(m % 60)}`;
+}
+
+// "HH:MM" → 分鐘數
+function hhmmToMin(value: string): number {
+  const [h, m] = value.split(":").map((n) => parseInt(n, 10));
+  return h * 60 + m;
+}
+
+// 週期密碼摘要：每週二、四 19:15–22:30
+function weeklySummary(c: DoorCode): string {
+  const days = (c.weekdays ?? [])
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => WEEKDAY_LABELS[d])
+    .join("、");
+  return `每週${days} ${minToHHMM(c.start_minute ?? 0)}–${minToHHMM(
+    c.end_minute ?? 0
   )}`;
 }
 
@@ -35,9 +64,19 @@ export default function AdminClient() {
 
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
+  const [mode, setMode] = useState<"once" | "weekly">("once");
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [saving, setSaving] = useState(false);
+
+  function toggleWeekday(d: number) {
+    setWeekdays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+    );
+  }
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/codes");
@@ -62,21 +101,53 @@ export default function AdminClient() {
       setError("密碼需為 6 位數字");
       return;
     }
-    if (!label || !validFrom || !validUntil) {
-      setError("請填寫所有欄位");
+    if (!label) {
+      setError("請填寫標籤");
       return;
     }
+
+    let body: Record<string, unknown>;
+    if (mode === "weekly") {
+      if (weekdays.length === 0) {
+        setError("請至少選一個星期");
+        return;
+      }
+      if (!startTime || !endTime) {
+        setError("請填寫開始與結束時間");
+        return;
+      }
+      if (hhmmToMin(startTime) >= hhmmToMin(endTime)) {
+        setError("結束時間需晚於開始時間");
+        return;
+      }
+      body = {
+        code,
+        label,
+        recurrence: "weekly",
+        weekdays,
+        start_minute: hhmmToMin(startTime),
+        end_minute: hhmmToMin(endTime),
+      };
+    } else {
+      if (!validFrom || !validUntil) {
+        setError("請填寫開始與結束時間");
+        return;
+      }
+      body = {
+        code,
+        label,
+        recurrence: "once",
+        valid_from: localToIso(validFrom),
+        valid_until: localToIso(validUntil),
+      };
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/admin/codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code,
-          label,
-          valid_from: localToIso(validFrom),
-          valid_until: localToIso(validUntil),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -87,6 +158,9 @@ export default function AdminClient() {
       setLabel("");
       setValidFrom("");
       setValidUntil("");
+      setWeekdays([]);
+      setStartTime("");
+      setEndTime("");
       await load();
     } finally {
       setSaving(false);
@@ -156,20 +230,88 @@ export default function AdminClient() {
                 className={inputCls}
               />
             </div>
-            <label className="text-sm text-zinc-500">開始時間</label>
-            <input
-              type="datetime-local"
-              value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
-              className={inputCls}
-            />
-            <label className="text-sm text-zinc-500">結束時間</label>
-            <input
-              type="datetime-local"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
-              className={inputCls}
-            />
+            {/* 模式切換：單次 / 每週 */}
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+              {(["once", "weekly"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`rounded-lg py-1.5 text-sm font-medium transition-colors ${
+                    mode === m
+                      ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-zinc-50"
+                      : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                  }`}
+                >
+                  {m === "once" ? "單次" : "每週"}
+                </button>
+              ))}
+            </div>
+
+            {mode === "once" ? (
+              <>
+                <label className="text-sm text-zinc-500">開始時間</label>
+                <input
+                  type="datetime-local"
+                  value={validFrom}
+                  onChange={(e) => setValidFrom(e.target.value)}
+                  className={inputCls}
+                />
+                <label className="text-sm text-zinc-500">結束時間</label>
+                <input
+                  type="datetime-local"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  className={inputCls}
+                />
+              </>
+            ) : (
+              <>
+                <label className="text-sm text-zinc-500">星期（可多選）</label>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {WEEKDAY_LABELS.map((lbl, d) => {
+                    const on = weekdays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => toggleWeekday(d)}
+                        className={`rounded-lg py-2 text-sm font-medium transition-colors ${
+                          on
+                            ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                            : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm text-zinc-500">開始時間</label>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm text-zinc-500">結束時間</label>
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  每週固定時段，永久有效直到手動停用。
+                </p>
+              </>
+            )}
             {error && <p className="text-sm text-red-500">{error}</p>}
             <button
               onClick={handleCreate}
@@ -189,7 +331,10 @@ export default function AdminClient() {
         ) : (
           <div className="flex flex-col gap-3">
             {codes.map((c) => {
-              const expired = new Date(c.valid_until).getTime() < nowMs;
+              const expired =
+                c.recurrence === "once" &&
+                !!c.valid_until &&
+                new Date(c.valid_until).getTime() < nowMs;
               return (
                 <div
                   key={c.id}
@@ -216,7 +361,11 @@ export default function AdminClient() {
                         )}
                       </div>
                       <div className="mt-1 text-sm text-zinc-500">
-                        {fmt(c.valid_from)} – {fmt(c.valid_until)}
+                        {c.recurrence === "weekly"
+                          ? weeklySummary(c)
+                          : c.valid_from && c.valid_until
+                          ? `${fmt(c.valid_from)} – ${fmt(c.valid_until)}`
+                          : ""}
                       </div>
                       <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                         已開門 {c.usage_count} 次

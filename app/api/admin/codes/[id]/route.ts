@@ -13,7 +13,17 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
 
   // 只允許更新這些欄位
-  const allowed = ["code", "label", "valid_from", "valid_until", "is_active"];
+  const allowed = [
+    "code",
+    "label",
+    "recurrence",
+    "weekdays",
+    "start_minute",
+    "end_minute",
+    "valid_from",
+    "valid_until",
+    "is_active",
+  ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
