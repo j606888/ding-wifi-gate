@@ -55,6 +55,23 @@ function localToIso(value: string): string {
   return new Date(value).toISOString();
 }
 
+// 一組密碼的時段摘要（單次顯示日期區間，每週顯示固定時段）
+function windowSummary(c: DoorCode): string {
+  if (c.recurrence === "weekly") return weeklySummary(c);
+  return c.valid_from && c.valid_until
+    ? `${fmt(c.valid_from)} – ${fmt(c.valid_until)}`
+    : "";
+}
+
+// 可一鍵複製貼到群組的分享訊息
+function shareText(c: DoorCode): string {
+  return [
+    "🔑 鐵捲門開門密碼",
+    `密碼：${c.code}`,
+    `開放時段：${windowSummary(c)}`,
+  ].join("\n");
+}
+
 export default function AdminClient() {
   const router = useRouter();
   const [codes, setCodes] = useState<DoorCode[]>([]);
@@ -71,6 +88,8 @@ export default function AdminClient() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<DoorCode | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   function toggleWeekday(d: number) {
     setWeekdays((prev) =>
@@ -178,7 +197,21 @@ export default function AdminClient() {
 
   async function remove(c: DoorCode) {
     await fetch(`/api/admin/codes/${c.id}`, { method: "DELETE" });
+    setConfirmTarget(null);
     await load();
+  }
+
+  async function share(c: DoorCode) {
+    try {
+      await navigator.clipboard.writeText(shareText(c));
+      setCopiedId(c.id);
+      setTimeout(
+        () => setCopiedId((id) => (id === c.id ? null : id)),
+        2000
+      );
+    } catch {
+      setError("複製失敗，請手動複製");
+    }
   }
 
   async function logout() {
@@ -361,11 +394,7 @@ export default function AdminClient() {
                         )}
                       </div>
                       <div className="mt-1 text-sm text-zinc-500">
-                        {c.recurrence === "weekly"
-                          ? weeklySummary(c)
-                          : c.valid_from && c.valid_until
-                          ? `${fmt(c.valid_from)} – ${fmt(c.valid_until)}`
-                          : ""}
+                        {windowSummary(c)}
                       </div>
                       <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                         已開門 {c.usage_count} 次
@@ -373,13 +402,19 @@ export default function AdminClient() {
                     </div>
                     <div className="flex flex-col gap-2 text-sm">
                       <button
+                        onClick={() => share(c)}
+                        className="rounded-lg border border-zinc-300 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        {copiedId === c.id ? "已複製 ✓" : "分享"}
+                      </button>
+                      <button
                         onClick={() => toggleActive(c)}
                         className="rounded-lg border border-zinc-300 px-3 py-1 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
                         {c.is_active ? "停用" : "啟用"}
                       </button>
                       <button
-                        onClick={() => remove(c)}
+                        onClick={() => setConfirmTarget(c)}
                         className="rounded-lg border border-red-200 px-3 py-1 text-red-500 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/30"
                       >
                         刪除
@@ -392,6 +427,42 @@ export default function AdminClient() {
           </div>
         )}
       </div>
+
+      {/* 刪除確認 */}
+      {confirmTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setConfirmTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
+              確定刪除這組密碼？
+            </h3>
+            <p className="mt-2 text-sm text-zinc-500">
+              <span className="font-mono">{confirmTarget.code}</span>
+              {confirmTarget.label ? `（${confirmTarget.label}）` : ""}
+              將被永久刪除，無法復原。
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="rounded-xl border border-zinc-300 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => remove(confirmTarget)}
+                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+              >
+                刪除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
