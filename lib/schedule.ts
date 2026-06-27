@@ -77,3 +77,64 @@ export function evaluateCode(
   const valid = from <= nowMs && nowMs <= until;
   return { valid, windowEndMs: valid ? until : null };
 }
+
+// ---- 日曆推導：把一組密碼攤平成「某一天有哪些開放時段」 ----
+// 台灣 UTC+8、無 DST，所以日界線用固定位移計算即可。
+
+const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 台灣本地的某一天（month 1-12）。 */
+export type CalDate = { year: number; month: number; day: number };
+
+/** 某日的單一開放時段，單位為當日分鐘數（end 為開區間，最大 1440=當日結束）。 */
+export type DayWindow = { startMinute: number; endMinute: number };
+
+/** 某個日期的星期（0=日..6=六）。固定位移下與時區無關。 */
+export function weekdayOf(date: CalDate): number {
+  return new Date(
+    Date.UTC(date.year, date.month - 1, date.day)
+  ).getUTCDay();
+}
+
+/** 該日台灣 00:00 的 epoch（ms）。 */
+export function taipeiDayStartMs(date: CalDate): number {
+  return Date.UTC(date.year, date.month - 1, date.day) - TAIPEI_OFFSET_MS;
+}
+
+/** 給定 epoch，取台灣當天的 CalDate（給日曆 anchor / 今天用）。 */
+export function getTaipeiDateParts(nowMs: number): CalDate {
+  const d = new Date(nowMs + TAIPEI_OFFSET_MS);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  };
+}
+
+/**
+ * 某一組密碼在指定台灣日期內的開放時段（可能為空）。
+ * weekly：星期相符就回固定時段；once：與該日交集後 clamp 成當日分鐘數。
+ * 與 evaluateCode 同一套 half-open 邏輯，確保日曆與實際開門一致。
+ */
+export function windowsForDate<T extends CodeRow>(
+  code: T,
+  date: CalDate
+): DayWindow[] {
+  if (code.recurrence === "weekly") {
+    if (!(code.weekdays ?? []).includes(weekdayOf(date))) return [];
+    return [
+      { startMinute: code.start_minute ?? 0, endMinute: code.end_minute ?? 0 },
+    ];
+  }
+
+  if (!code.valid_from || !code.valid_until) return [];
+  const dayStart = taipeiDayStartMs(date);
+  const dayEnd = dayStart + DAY_MS;
+  const s = Math.max(Date.parse(code.valid_from), dayStart);
+  const e = Math.min(Date.parse(code.valid_until), dayEnd);
+  if (s >= e) return [];
+  return [
+    { startMinute: (s - dayStart) / 60000, endMinute: (e - dayStart) / 60000 },
+  ];
+}

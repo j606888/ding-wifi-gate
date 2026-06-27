@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import * as crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
-import { ACTION_LABEL, logAccess, notifyBark } from "@/lib/access";
+import {
+  ACTION_LABEL,
+  formatAccessTime,
+  logAccess,
+  notifyBark,
+} from "@/lib/access";
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET!;
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN!;
@@ -58,23 +63,6 @@ async function getOrCreateUser(lineUserId: string): Promise<{
     is_active: false,
   });
   return { displayName, is_active: false, isNew: true };
-}
-
-function formatAccessTime(isoString: string): string {
-  const now = Date.now();
-  const ts = new Date(isoString).getTime();
-  const diffSec = Math.floor((now - ts) / 1000);
-
-  if (diffSec < 60) return `${diffSec} 秒前`;
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} 分鐘前`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} 小時前`;
-
-  const taipeiDate = new Date(ts + 8 * 60 * 60 * 1000);
-  const m = String(taipeiDate.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(taipeiDate.getUTCDate()).padStart(2, "0");
-  const h = String(taipeiDate.getUTCHours()).padStart(2, "0");
-  const min = String(taipeiDate.getUTCMinutes()).padStart(2, "0");
-  return `${m}/${d} ${h}:${min}`;
 }
 
 async function getLatestAccessLogs(): Promise<

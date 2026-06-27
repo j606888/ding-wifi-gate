@@ -1,10 +1,8 @@
 import { supabase } from "@/lib/supabase";
+import { ACTION_LABEL } from "@/lib/access-format";
 
-export const ACTION_LABEL: Record<string, string> = {
-  open: "開門",
-  close: "關門",
-  stop: "停止",
-};
+// 為了相容既有 server 端 import（webhook 等），從 client-safe 模組 re-export。
+export { ACTION_LABEL, formatAccessTime } from "@/lib/access-format";
 
 type LogAccessParams = {
   action: string;
