@@ -78,6 +78,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `APP_SECRET`（HMAC 簽章密鑰，用於管理員 cookie ＋ 關門 token）
 - `BARK_KEYS`（Bark iOS 推播 Key，門被操作時發推播；可用逗號分隔多人，例如 `key1,key2`）
 - `BARK_SERVER`（選填，自架 Bark 伺服器；預設 `https://api.day.app`）
+- `MQTT_DRY_RUN`（選填，設 `1`/`true` 時只印 log 不真的發 MQTT，本機測試開/關門流程用，鐵門不會動）
 
 ## 檔案結構
 
