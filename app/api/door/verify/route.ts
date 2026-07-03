@@ -38,19 +38,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 驗證密碼：正確、啟用中、現在落在可用時段內（單次或每週，於 JS 判斷）
+  // 驗證密碼：正確、啟用中、現在落在可用時段內（單次或每週，於 JS 判斷）。
+  // 不在 SQL 過濾 is_active，改在 JS 判斷，才能區分「查無此碼/已停用」與「時段外」。
   const { data: rows } = await supabase
     .from("door_codes")
     .select(
-      "id, label, recurrence, weekdays, start_minute, end_minute, valid_from, valid_until"
+      "id, label, recurrence, weekdays, start_minute, end_minute, valid_from, valid_until, is_active"
     )
     .eq("code", code)
-    .eq("is_active", true)
     .order("created_at", { ascending: false });
+
+  const activeRows = (rows ?? []).filter((r) => r.is_active);
 
   let codeRow: { id: number; label: string } | null = null;
   let windowEndMs = 0;
-  for (const row of rows ?? []) {
+  for (const row of activeRows) {
     const { valid, windowEndMs: end } = evaluateCode(row, now);
     if (valid) {
       codeRow = { id: row.id, label: row.label };
@@ -60,9 +62,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (!codeRow) {
+    // 密碼真實且啟用中，只是現在不在時段內 → 快捷仍有效，保留、不計速率限制
+    if (activeRows.length > 0) {
+      return NextResponse.json(
+        { error: "目前不在可用時間內，晚點再試", reason: "out_of_window" },
+        { status: 403 }
+      );
+    }
+    // 查無此啟用密碼（打錯 or 已停用）→ 快捷已死，記速率限制
     await supabase.from("door_attempts").insert({ ip });
     return NextResponse.json(
-      { error: "密碼錯誤或不在可用時間內" },
+      { error: "密碼錯誤或已停用", reason: "invalid" },
       { status: 401 }
     );
   }
