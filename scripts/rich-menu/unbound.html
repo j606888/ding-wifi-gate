@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- LINE Rich Menu「尚未綁定」：左 1500px 輸入啟動碼、右 1000px 申請使用（區塊座標見 ../setup_rich_menu.sh） -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;900&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 2500px; height: 843px; overflow: hidden; }
+  body { display: grid; grid-template-columns: 1500px 1000px; font-family: 'Noto Sans TC', 'PingFang TC', sans-serif; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; }
+  .title { font-weight: 900; line-height: 1; }
+  .sub { font-size: 60px; font-weight: 500; line-height: 1; }
+</style>
+</head>
+<body>
+  <div class="cell" style="background:#c2410c;color:#fff">
+    <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>
+    <div class="title" style="font-size:132px">輸入啟動碼</div>
+    <div class="sub" style="opacity:.88">屋主給你的 6 位數，輸入後馬上能用</div>
+  </div>
+  <div class="cell" style="background:#f3f1ec;color:#1a1b1e;border-left:8px solid #e6e2da">
+    <svg width="180" height="180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 11-5.7"/><path d="M16 19l2 2 4-4"/></svg>
+    <div class="title" style="font-size:120px">申請使用</div>
+    <div class="sub" style="color:#4a4d53">請屋主幫你開通</div>
+  </div>
+</body>
+</html>

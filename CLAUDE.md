@@ -79,6 +79,8 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `BARK_KEYS`（Bark iOS 推播 Key，門被操作時發推播；可用逗號分隔多人，例如 `key1,key2`）
 - `BARK_SERVER`（選填，自架 Bark 伺服器；預設 `https://api.day.app`）
 - `MQTT_DRY_RUN`（選填，設 `1`/`true` 時只印 log 不真的發 MQTT，本機測試開/關門流程用，鐵門不會動）
+- `LINE_RICH_MENU_BOUND_ID`（「已綁定」Rich Menu 的 ID，`scripts/setup_rich_menu.sh` 跑完會印出；沒設時開通不會換選單）
+- `LINE_ADD_FRIEND_URL`（選填，LINE 加好友連結，放進啟動碼的分享訊息）
 
 ## 檔案結構
 
@@ -106,18 +108,26 @@ ding-wifi-gate/
 │       └── admin/
 │           ├── door/route.ts      # POST - 後台控制分頁開/關/停
 │           ├── login/route.ts     # POST 登入 / DELETE 登出
+│           ├── members/route.ts   # GET LINE 成員＋上次使用＋啟動碼
+│           │   └── [id]/route.ts  # PATCH 開通/停用（換 Rich Menu、推播通知）/ 忽略申請
+│           ├── activation-codes/route.ts # POST 產生啟動碼
+│           │   └── [id]/route.ts  # DELETE 作廢
 │           └── codes/route.ts     # GET 清單(含次數) / POST 新增
 │               └── [id]/route.ts  # PATCH 編輯/停用 / DELETE 刪除
 ├── lib/
 │   ├── supabase.ts        # Supabase client
 │   ├── mqtt.ts            # publishMQTT（共用）
 │   ├── guest-name.ts      # 訪客名字：清理、顯示名稱、localStorage（client-safe）
-│   ├── access.ts          # logAccess / notifyBark / ACTION_LABEL（共用）
+│   ├── access.ts          # logAccess / notifyBark / sendBark / ACTION_LABEL（共用）
+│   ├── line.ts            # LINE 回覆/推播/個人資料/個人 Rich Menu 切換
+│   ├── members.ts         # 開通、停用、申請、啟動碼兌換（webhook 與後台共用）
 │   └── auth.ts            # HMAC signToken/verifyToken / requireAdmin
 ├── scripts/
-│   └── schema.sql         # 密碼功能的 Supabase 資料表 DDL
+│   ├── schema.sql         # Supabase 資料表 DDL（可重複執行）
+│   ├── setup_rich_menu.sh # 建立「尚未綁定／已綁定」兩種 Rich Menu
+│   └── rich-menu/         # Rich Menu 圖片的 HTML 原稿 + render.sh（Chrome headless 截圖）
 ├── public/
-│   └── line-rich-menu.png # LINE Rich Menu 圖片
+│   └── line-rich-menu-{unbound,bound}.png # LINE Rich Menu 圖片（render.sh 產生）
 ├── .env.local             # 所有密碼（不進 git）
 └── CLAUDE.md
 ```
@@ -157,7 +167,11 @@ ding-wifi-gate/
 |------|------|------|
 | `line_user_id` | text | LINE userId（主鍵） |
 | `display_name` | text | LINE 顯示名稱 |
-| `is_active` | bool | 是否有權限（預設 false，管理員手動改） |
+| `is_active` | bool | 是否有權限（預設 false；後台開通或輸入啟動碼） |
+| `is_admin` | bool | 管理員（「誰來了」「後台」只回給管理員；在 Supabase 手動設） |
+| `requested_at` / `requested_via` | timestamptz / text | 按「申請使用」或沒權限時按開門 → 後台「等待開通」 |
+| `dismissed_at` | timestamptz | 管理員在等待開通按「忽略」 |
+| `activated_via` / `activation_code_id` / `activated_at` | text / int8 / timestamptz | 怎麼開通的（`manual` / `code`） |
 | `created_at` | timestamptz | 建立時間 |
 
 ### `access_logs`
@@ -190,6 +204,22 @@ ding-wifi-gate/
 | `created_at` | timestamptz | 失敗嘗試時間 |
 
 > 同 IP 10 分鐘內密碼錯誤超過 10 次 → `/api/door/verify` 回 429 擋下。
+> 啟動碼也共用這張表（`ip` 存 `line:<userId>`），同一個 LINE 帳號 10 分鐘內輸錯 5 次就先擋。
+
+### `activation_codes`（LINE 啟動碼）
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `code` | text | 6 位數 |
+| `label` | text | 給誰用（只給管理員看） |
+| `max_uses` / `used_count` | int | 可用次數（null = 不限）/ 已用次數 |
+| `expires_at` | timestamptz | 過期後不能再兌換，已開通的人不受影響 |
+| `revoked_at` | timestamptz | 管理員作廢 |
+
+## LINE 成員開通流程
+
+- 預設 Rich Menu「尚未綁定」：**輸入啟動碼**／**申請使用**。開通的人個別綁「已綁定」選單（開門／關門／停止），停用就解除綁定回到預設。
+- **啟動碼**：後台產生（次數 1／5／不限、期限 1 小時／1 天／7 天），分享訊息給朋友；朋友在 LINE 傳 6 位數 → 馬上開通、換選單、Bark 通知管理員。
+- **申請使用**：沒啟動碼的人按「申請使用」（或沒權限時按開門）→ 後台「等待開通」＋ Bark（10 分鐘內重複不再推）。管理員按「開通」→ 換選單＋ LINE 推播通知對方。
 
 ## 網頁密碼開門流程
 
@@ -211,7 +241,9 @@ ding-wifi-gate/
 | 開門 / 開 | `open` | 鐵捲門上升 |
 | 關門 / 關 | `close` | 鐵捲門下降 |
 | 停 | `stop` | 停止 |
-| 誰來了 | （查詢）| 顯示最新 5 筆成功操作紀錄（相對時間） |
+| 誰來了 | （查詢）| 只有管理員：顯示最新 5 筆成功操作紀錄（相對時間） |
+| 後台 / admin | （查詢）| 只有管理員：回後台網址 |
+| 輸入啟動碼 / 6 位數 / 申請使用 | — | 尚未開通的人用（見「LINE 成員開通流程」） |
 
 ## 開發環境
 

@@ -7,6 +7,8 @@ import ControlTab from "./control/ControlTab";
 import CodesTab from "./codes/CodesTab";
 import CalendarTab from "./calendar/CalendarTab";
 import LogsTab from "./logs/LogsTab";
+import MembersTab from "./members/MembersTab";
+import { isPending, type ActivationCode, type Member } from "./members/format";
 import {
   CalendarIcon,
   ClockIcon,
@@ -14,12 +16,13 @@ import {
   KeyIcon,
   LogoutIcon,
   SlidersIcon,
+  UsersIcon,
 } from "@/app/components/icons";
 
-// 手機：底部導覽 控制 / 紀錄 / 管理（管理裡再切 訪客密碼 / 日曆）
-// 電腦（lg 以上）：左側選單直接列出四個頁面
-type Tab = "control" | "logs" | "codes" | "calendar";
-type ManageTab = "codes" | "calendar";
+// 手機：底部導覽 控制 / 紀錄 / 管理（管理裡再切 訪客密碼 / LINE 成員 / 日曆）
+// 電腦（lg 以上）：左側選單直接列出五個頁面
+type Tab = "control" | "logs" | "codes" | "members" | "calendar";
+type ManageTab = "codes" | "members" | "calendar";
 
 const GATE_NAME = "丁宅鐵捲門";
 
@@ -33,15 +36,18 @@ const SIDEBAR_TABS: { key: Tab; label: string; Icon: typeof GarageIcon }[] = [
   { key: "control", label: "控制", Icon: SlidersIcon },
   { key: "logs", label: "紀錄", Icon: ClockIcon },
   { key: "codes", label: "訪客密碼", Icon: KeyIcon },
+  { key: "members", label: "LINE 成員", Icon: UsersIcon },
   { key: "calendar", label: "日曆", Icon: CalendarIcon },
 ];
 
 const MANAGE_TABS: { key: ManageTab; label: string }[] = [
   { key: "codes", label: "訪客密碼" },
+  { key: "members", label: "LINE 成員" },
   { key: "calendar", label: "日曆" },
 ];
 
-const isManage = (t: Tab): t is ManageTab => t === "codes" || t === "calendar";
+const isManage = (t: Tab): t is ManageTab =>
+  t === "codes" || t === "members" || t === "calendar";
 
 export default function AdminClient() {
   const router = useRouter();
@@ -52,6 +58,11 @@ export default function AdminClient() {
   const [loading, setLoading] = useState(true);
   const [nowMs] = useState(() => Date.now());
   const [toast, setToast] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [activationCodes, setActivationCodes] = useState<ActivationCode[]>([]);
+  const [addFriendUrl, setAddFriendUrl] = useState("");
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersNowMs, setMembersNowMs] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/codes");
@@ -64,11 +75,29 @@ export default function AdminClient() {
     setLoading(false);
   }, [router]);
 
+  // LINE 成員：進頁面就載入，選單上的「等待開通」數字才看得到
+  const loadMembers = useCallback(async () => {
+    const res = await fetch("/api/admin/members");
+    if (res.status === 401) {
+      router.replace("/admin/login");
+      return;
+    }
+    const data = await res.json();
+    setMembers(data.members ?? []);
+    setActivationCodes(data.codes ?? []);
+    setAddFriendUrl(data.addFriendUrl ?? "");
+    setMembersNowMs(Date.now());
+    setMembersLoading(false);
+  }, [router]);
+
   useEffect(() => {
-    // 進頁面時載入一次密碼清單（取資料後才 setState）
+    // 進頁面時載入一次密碼清單與成員（取資料後才 setState）
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, [load]);
+    loadMembers();
+  }, [load, loadMembers]);
+
+  const pendingCount = members.filter(isPending).length;
 
   function go(t: Tab) {
     setTab(t);
@@ -126,7 +155,15 @@ export default function AdminClient() {
                 }`}
               >
                 <Icon size={20} strokeWidth={1.8} />
-                {label}
+                <span className="flex-1">{label}</span>
+                {key === "members" && pendingCount > 0 && (
+                  <span
+                    aria-label={`${pendingCount} 人等待開通`}
+                    className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-white"
+                  >
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -177,7 +214,7 @@ export default function AdminClient() {
                   登出
                 </button>
               </div>
-              <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-sunken p-1">
+              <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-sunken p-1">
                 {MANAGE_TABS.map((t) => (
                   <button
                     key={t.key}
@@ -190,6 +227,7 @@ export default function AdminClient() {
                     }`}
                   >
                     {t.label}
+                    {t.key === "members" && pendingCount > 0 && ` (${pendingCount})`}
                   </button>
                 ))}
               </div>
@@ -200,6 +238,17 @@ export default function AdminClient() {
                 loading={loading}
                 load={load}
                 nowMs={nowMs}
+                showToast={showToast}
+              />
+            )}
+            {tab === "members" && (
+              <MembersTab
+                members={members}
+                codes={activationCodes}
+                addFriendUrl={addFriendUrl}
+                loading={membersLoading}
+                load={loadMembers}
+                nowMs={membersNowMs}
                 showToast={showToast}
               />
             )}
@@ -223,12 +272,20 @@ export default function AdminClient() {
                 key={key}
                 onClick={() => go(key === "manage" ? lastManage : key)}
                 aria-current={on ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 p-1.5 text-xs ${
+                className={`relative flex flex-col items-center gap-0.5 p-1.5 text-xs ${
                   on ? "font-bold text-accent" : "text-muted"
                 }`}
               >
                 <Icon size={24} />
                 {label}
+                {key === "manage" && pendingCount > 0 && (
+                  <span
+                    aria-label={`${pendingCount} 人等待開通`}
+                    className="absolute left-[56%] top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white"
+                  >
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             );
           })}
