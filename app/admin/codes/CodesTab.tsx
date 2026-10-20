@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DoorCode, shareText } from "../shared";
+import { DoorCode, shareText, Sheet } from "../shared";
 import CodeForm, { codeToForm, EMPTY_FORM } from "../CodeForm";
 import CodeCard, { isDead } from "./CodeCard";
 import { PlusIcon } from "@/app/components/icons";
@@ -223,38 +223,6 @@ export default function CodesTab({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// 表單容器：手機全螢幕；電腦版從右側滑出，左邊還看得到密碼清單
-function Sheet({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    // 點旁邊不關閉，避免填到一半誤觸弄丟
-    <div className="fixed inset-0 z-50 bg-ground lg:flex lg:justify-end lg:bg-black/25">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="mx-auto flex h-full max-w-md flex-col overflow-y-auto lg:mx-0 lg:w-[440px] lg:max-w-none lg:border-l lg:border-line lg:bg-ground lg:shadow-2xl"
-      >
-        <header className="grid grid-cols-[72px_1fr_72px] items-center px-3 pb-2 pt-3">
-          <button onClick={onClose} className="h-11 px-2 text-left text-base">
-            取消
-          </button>
-          <h2 className="text-center text-[17px] font-bold">{title}</h2>
-          <span />
-        </header>
-        {children}
-      </div>
     </div>
   );
 }

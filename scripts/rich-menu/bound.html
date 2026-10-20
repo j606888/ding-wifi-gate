@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- LINE Rich Menu「已綁定」：開門 / 關門 / 停止 三等分（區塊座標見 ../setup_rich_menu.sh） -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 2500px; height: 843px; overflow: hidden; }
+  body { display: grid; grid-template-columns: 833px 834px 833px; font-family: 'Noto Sans TC', 'PingFang TC', sans-serif; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; }
+  .title { font-size: 120px; font-weight: 900; line-height: 1; }
+</style>
+</head>
+<body>
+  <div class="cell" style="background:#c2410c;color:#fff">
+    <svg width="220" height="220" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    <div class="title">開門</div>
+  </div>
+  <div class="cell" style="background:#1a1b1e;color:#fff">
+    <svg width="220" height="220" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    <div class="title">關門</div>
+  </div>
+  <div class="cell" style="background:#e6e2da;color:#1a1b1e">
+    <svg width="190" height="190" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+    <div class="title">停止</div>
+  </div>
+</body>
+</html>

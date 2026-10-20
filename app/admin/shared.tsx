@@ -1,5 +1,6 @@
 // Admin 共用：DoorCode 型別 + 格式化 helper + 小元件。
 // 密碼 tab 與日曆 tab 都會用到。
+import type { ReactNode } from "react";
 import { windowSummary } from "@/lib/code-format";
 
 // 時段摘要搬到 lib/code-format（server 也要用），這裡 re-export 給既有 import。
@@ -54,5 +55,37 @@ export const inputCls =
 export function Spinner() {
   return (
     <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent align-[-2px]" />
+  );
+}
+
+// 表單容器：手機全螢幕；電腦版從右側滑出，左邊還看得到密碼清單
+export function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    // 點旁邊不關閉，避免填到一半誤觸弄丟
+    <div className="fixed inset-0 z-50 bg-ground lg:flex lg:justify-end lg:bg-black/25">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="mx-auto flex h-full max-w-md flex-col overflow-y-auto lg:mx-0 lg:w-[440px] lg:max-w-none lg:border-l lg:border-line lg:bg-ground lg:shadow-2xl"
+      >
+        <header className="grid grid-cols-[72px_1fr_72px] items-center px-3 pb-2 pt-3">
+          <button onClick={onClose} className="h-11 px-2 text-left text-base">
+            取消
+          </button>
+          <h2 className="text-center text-[17px] font-bold">{title}</h2>
+          <span />
+        </header>
+        {children}
+      </div>
+    </div>
   );
 }

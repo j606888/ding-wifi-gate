@@ -28,6 +28,11 @@ export async function notifyBark(
   displayName: string,
   action: string
 ): Promise<void> {
+  await sendBark(`${displayName} ${ACTION_LABEL[action] ?? action}`);
+}
+
+/** 任意內容的 Bark 推播（例如「Leo 申請使用鐵捲門」）。 */
+export async function sendBark(body: string): Promise<void> {
   const keys = (process.env.BARK_KEYS ?? "")
     .split(",")
     .map((k) => k.trim())
@@ -36,7 +41,7 @@ export async function notifyBark(
   const server = process.env.BARK_SERVER ?? "https://api.day.app";
   const payload = {
     title: "鐵捲門",
-    body: `${displayName} ${ACTION_LABEL[action] ?? action}`,
+    body,
     group: "garage",
   };
   await Promise.all(
