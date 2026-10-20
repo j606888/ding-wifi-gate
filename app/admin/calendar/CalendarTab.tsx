@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   CalDate,
+  getLocalParts,
   getTaipeiDateParts,
   weekdayOf,
   windowsForDate,
@@ -12,6 +13,8 @@ import { DayEntry } from "./types";
 import { colorFor } from "./colors";
 import WeekView, { WeekDay } from "./WeekView";
 import MonthView, { MonthDay } from "./MonthView";
+import { isPastEntry } from "./format";
+import { DatedEntry, NextSlotCard, WeekSummary } from "./WeekSummary";
 
 function addDays(date: CalDate, n: number): CalDate {
   const d = new Date(Date.UTC(date.year, date.month - 1, date.day + n));
@@ -29,6 +32,14 @@ function addMonths(date: CalDate, n: number): CalDate {
 
 function sameDate(a: CalDate, b: CalDate): boolean {
   return a.year === b.year && a.month === b.month && a.day === b.day;
+}
+
+// b 減 a 差幾天
+function diffDays(a: CalDate, b: CalDate): number {
+  return Math.round(
+    (Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) /
+      86_400_000
+  );
 }
 
 // 週一為一週起點：距離週一幾天
@@ -49,8 +60,11 @@ export default function CalendarTab({
   showToast: (msg: string) => void;
 }) {
   const today = getTaipeiDateParts(nowMs);
+  const nowMinute = getLocalParts(nowMs).minutes;
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState<CalDate>(today);
+  const [showAllDay, setShowAllDay] = useState(false);
+  const toggleAllDay = () => setShowAllDay((v) => !v);
   const [detail, setDetail] = useState<{
     title: string;
     entries: DayEntry[];
@@ -68,9 +82,30 @@ export default function CalendarTab({
   const weekStart = addDays(anchor, -mondayOffset(anchor));
   const weekDays: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    return { date, isToday: sameDate(date, today), entries: entriesForDate(date) };
+    return {
+      date,
+      isToday: sameDate(date, today),
+      dayOffset: diffDays(today, date),
+      entries: entriesForDate(date),
+    };
   });
   const weekEnd = weekDays[6].date;
+  const byStart = (a: DayEntry, b: DayEntry) => a.startMinute - b.startMinute;
+  const weekItems: DatedEntry[] = weekDays.flatMap((d) =>
+    [...d.entries]
+      .sort(byStart)
+      .map((entry) => ({ date: d.date, dayOffset: d.dayOffset, entry }))
+  );
+
+  // ---- 下一個時段（含進行中），往後找兩週 ----
+  let nextSlot: DatedEntry | null = null;
+  for (let i = 0; i < 14 && !nextSlot; i++) {
+    const date = addDays(today, i);
+    const entry = entriesForDate(date)
+      .sort(byStart)
+      .find((e) => !isPastEntry(e, i, nowMinute));
+    if (entry) nextSlot = { date, dayOffset: i, entry };
+  }
 
   // ---- 月檢視資料 ----
   const firstOfMonth: CalDate = { ...anchor, day: 1 };
@@ -145,7 +180,29 @@ export default function CalendarTab({
       </div>
 
       {view === "week" ? (
-        <WeekView days={weekDays} onTapEntry={tapEntry} />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-5">
+          <div className="min-w-0 lg:flex-1">
+            <WeekView
+              days={weekDays}
+              nowMinute={nowMinute}
+              showAllDay={showAllDay}
+              onToggleAllDay={toggleAllDay}
+              onTapEntry={tapEntry}
+            />
+          </div>
+          <aside className="flex flex-col gap-4 lg:w-80 lg:shrink-0">
+            <NextSlotCard next={nextSlot} nowMinute={nowMinute} onTap={tapEntry} />
+            <div className="hidden flex-col gap-4 lg:flex">
+              <WeekSummary
+                items={weekItems}
+                nowMinute={nowMinute}
+                showAllDay={showAllDay}
+                onToggleAllDay={toggleAllDay}
+                onTap={tapEntry}
+              />
+            </div>
+          </aside>
+        </div>
       ) : (
         <MonthView cells={monthCells} onTapDay={tapDay} />
       )}
