@@ -107,15 +107,15 @@ export default function CalendarTab({
   return (
     <div className="flex flex-col gap-3">
       {/* 週/月切換 */}
-      <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-sunken p-1 dark:bg-zinc-800">
         {(["week", "month"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
             className={`rounded-lg py-1.5 text-sm font-medium transition-colors ${
               view === v
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-zinc-50"
-                : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                ? "bg-surface font-bold text-ink dark:bg-zinc-950 dark:text-zinc-50"
+                : "text-subtle hover:text-ink dark:hover:text-zinc-300"
             }`}
           >
             {v === "week" ? "週" : "月"}

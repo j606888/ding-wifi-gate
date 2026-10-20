@@ -89,23 +89,29 @@ ding-wifi-gate/
 │       └── main.ino       # ESP32 韌體：連 Wi-Fi + 訂閱 MQTT + 繼電器控制
 ├── app/
 │   ├── page.tsx           # 公開密碼開門頁（輸入密碼→開門→關門按鈕）
+│   ├── components/
+│   │   ├── GarageScene.tsx# 鐵捲門插畫＋動畫（5 秒捲上/下，門開 3 秒後小偷探頭）
+│   │   └── icons.tsx      # 線條圖示
 │   ├── admin/
 │   │   ├── page.tsx       # 後台（server component，驗 cookie）
-│   │   ├── AdminClient.tsx# 後台 UI：新增/停用/刪除密碼、看使用次數
+│   │   ├── AdminClient.tsx# 後台外框：手機底部導覽 控制 / 紀錄 / 管理；電腦版（lg 以上）左側選單
+│   │   ├── control/       # 控制分頁：遠端開/關/停，門狀態由最新紀錄推算
 │   │   └── login/page.tsx # 管理員登入頁
 │   └── api/
 │       ├── garage/route.ts        # POST /api/garage - 直接觸發（測試用）
 │       ├── webhook/route.ts       # POST /api/webhook - LINE Bot 入口
 │       ├── door/
 │       │   ├── verify/route.ts    # POST - 驗密碼＋開門，回關門 token
-│       │   └── close/route.ts     # POST - 用 token 關門
+│       │   └── close/route.ts     # POST - 用 token 關門或緊急停止（action: close/stop）
 │       └── admin/
+│           ├── door/route.ts      # POST - 後台控制分頁開/關/停
 │           ├── login/route.ts     # POST 登入 / DELETE 登出
 │           └── codes/route.ts     # GET 清單(含次數) / POST 新增
 │               └── [id]/route.ts  # PATCH 編輯/停用 / DELETE 刪除
 ├── lib/
 │   ├── supabase.ts        # Supabase client
 │   ├── mqtt.ts            # publishMQTT（共用）
+│   ├── guest-name.ts      # 訪客名字：清理、顯示名稱、localStorage（client-safe）
 │   ├── access.ts          # logAccess / notifyBark / ACTION_LABEL（共用）
 │   └── auth.ts            # HMAC signToken/verifyToken / requireAdmin
 ├── scripts/
@@ -193,6 +199,9 @@ ding-wifi-gate/
   與「記得幫我關門」提醒；按關門 → `POST /api/door/close`（帶 token）發 MQTT `close`。
 - **後台 `/admin`**：用 `ADMIN_PASSWORD` 登入（HMAC 簽章 httpOnly cookie，7 天）。可
   新增/停用/刪除密碼、看每組密碼成功開門次數。所有 `/api/admin/*` 都先 `requireAdmin`。
+- **訪客名字**：共用密碼多人在用時，`/` 會先請訪客填名字（只需填一次，存在手機
+  localStorage）。名字送到 verify、簽進關門 token，紀錄與推播顯示成 `🔑 小明（週二 Bachata 課）`。
+  名字是自填的，只用來分辨熟人，不是身分驗證。
 - 安全：6 位數字靠「時間區間 + IP 速率限制」降風險；關門 token 過期需重新輸密碼。
 
 ## LINE 指令對應

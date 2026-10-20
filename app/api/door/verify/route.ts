@@ -4,6 +4,8 @@ import { publishMQTT } from "@/lib/mqtt";
 import { logAccess, notifyBark } from "@/lib/access";
 import { signToken } from "@/lib/auth";
 import { evaluateCode } from "@/lib/schedule";
+import { windowSummary } from "@/lib/code-format";
+import { cleanGuestName, guestDisplayName } from "@/lib/guest-name";
 
 const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 分鐘
 const RATE_MAX_FAILS = 10; // 同 IP 10 分鐘內最多 10 次失敗
@@ -19,7 +21,10 @@ export async function POST(req: NextRequest) {
   const now = Date.now();
   const ip = clientIp(req);
 
-  const { code } = await req.json().catch(() => ({ code: "" }));
+  const { code, name: rawName } = await req
+    .json()
+    .catch(() => ({ code: "", name: "" }));
+  const name = cleanGuestName(rawName);
   if (typeof code !== "string" || !/^\d{6}$/.test(code)) {
     return NextResponse.json({ error: "密碼格式錯誤" }, { status: 400 });
   }
@@ -65,7 +70,11 @@ export async function POST(req: NextRequest) {
     // 密碼真實且啟用中，只是現在不在時段內 → 快捷仍有效，保留、不計速率限制
     if (activeRows.length > 0) {
       return NextResponse.json(
-        { error: "目前不在可用時間內，晚點再試", reason: "out_of_window" },
+        {
+          error: "目前不在可用時間內，晚點再試",
+          reason: "out_of_window",
+          window: windowSummary(activeRows[0]),
+        },
         { status: 403 }
       );
     }
@@ -84,18 +93,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "發送失敗，請稍後再試" }, { status: 502 });
   }
 
+  const displayName = guestDisplayName(codeRow.label, name);
   await logAccess({
     action: "open",
     status: "success",
-    displayName: `🔑 ${codeRow.label}`,
+    displayName,
     source: "web",
     codeId: codeRow.id,
   });
-  await notifyBark(`🔑 ${codeRow.label}`, "open").catch(() => {});
+  await notifyBark(displayName, "open").catch(() => {});
 
   // 關門 token：min(30 分, 本次時段結束時間)
   const ttl = Math.max(0, Math.min(CLOSE_TOKEN_TTL_MS, windowEndMs - now));
-  const token = signToken({ codeId: codeRow.id, label: codeRow.label }, ttl, now);
+  const token = signToken(
+    { codeId: codeRow.id, label: codeRow.label, name },
+    ttl,
+    now
+  );
 
-  return NextResponse.json({ status: "ok", label: codeRow.label, token });
+  return NextResponse.json({
+    status: "ok",
+    label: codeRow.label,
+    token,
+    expiresAt: now + ttl,
+  });
 }
