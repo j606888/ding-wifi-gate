@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* 這一階段只有淺色版：dark: 只在 .dark class 下生效（目前沒有地方加），
+   避免舊元件殘留的 dark: 樣式在系統深色模式下把畫面變成一半深一半淺。 */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-ground: #f3f1ec;
+  --color-surface: #ffffff;
+  --color-sunken: #e6e2da;
+  --color-faded: #ebe8e1;
+  --color-ink: #1a1b1e;
+  --color-subtle: #4a4d53;
+  --color-muted: #5e6168;
+  --color-line: #e2dfd8;
+  --color-line-soft: #eeece6;
+  --color-line-strong: #cfcac0;
+  --color-accent: #c2410c;
+  --color-accent-hover: #9a3412;
+  --color-accent-soft: #ffedd5;
+  --color-warn-bg: #fff4e5;
+  --color-warn-ink: #8a3b07;
+  --color-ok: #15803d;
+  --color-ok-dot: #16a34a;
+  --color-ok-bg: #dcfce7;
+  --color-info-ink: #3730a3;
+  --color-info-bg: #eef2ff;
+  --color-danger: #991b1b;
+  --color-danger-bg: #fdecec;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-noto-sans-tc), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* ---- 鐵捲門場景（app/components/GarageScene.tsx） ---- */
+
+.garage-door {
+  transition: transform 5s ease-in-out;
+}
+.garage-door.is-up {
+  transform: translateY(-128px);
+}
+.garage-door.no-anim {
+  transition: none;
+}
+
+.garage-thief {
+  transform: translateX(140px);
+}
+.garage-thief.is-peeking {
+  animation: garage-thief-peek 7s ease-in-out infinite;
+}
+.garage-thief-eyes {
+  animation: garage-thief-eyes 3.5s ease-in-out infinite;
+}
+
+@keyframes garage-thief-peek {
+  0% { transform: translateX(140px); }
+  12%, 34% { transform: translateX(0); }
+  40% { transform: translateX(22px); }
+  48%, 82% { transform: translateX(0); }
+  94%, 100% { transform: translateX(140px); }
+}
+
+@keyframes garage-thief-eyes {
+  0%, 30% { transform: translateX(0); }
+  40%, 60% { transform: translateX(-2.5px); }
+  70%, 100% { transform: translateX(1px); }
+}
+
+/* 沒填名字就按開門：輸入框左右抖一下 */
+@keyframes field-shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-8px); }
+  35%, 75% { transform: translateX(8px); }
+}
+.field-shake {
+  animation: field-shake 0.45s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-shake {
+    animation: none;
+  }
+  .garage-door {
+    transition: none;
+  }
+  .garage-thief.is-peeking {
+    animation: none;
+    transform: none;
+  }
+  .garage-thief-eyes {
+    animation: none;
+  }
 }

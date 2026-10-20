@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { DoorCode, shareText } from "../shared";
 import CodeForm, { codeToForm, EMPTY_FORM } from "../CodeForm";
-import CodeCard from "./CodeCard";
+import CodeCard, { isDead } from "./CodeCard";
+import { PlusIcon } from "@/app/components/icons";
 
 export default function CodesTab({
   codes,
@@ -25,16 +26,16 @@ export default function CodesTab({
 
   async function handleCreate(
     body: Record<string, unknown>
-  ): Promise<string | null> {
+  ): Promise<{ error: string | null; created?: DoorCode }> {
     const res = await fetch("/api/admin/codes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) return data.error ?? "建立失敗";
+    if (!res.ok) return { error: data.error ?? "建立失敗" };
     await load();
-    return null;
+    return { error: null, created: { ...data.code, usage_count: 0 } };
   }
 
   async function handleUpdate(
@@ -72,156 +73,149 @@ export default function CodesTab({
     await load();
   }
 
-  async function share(c: DoorCode) {
+  async function share(c: DoorCode, created = false) {
     try {
       await navigator.clipboard.writeText(shareText(c));
-      showToast("已複製分享訊息");
+      showToast(created ? "已建立，分享訊息已複製" : "已複製分享訊息");
     } catch {
-      showToast("複製失敗，請手動複製");
+      // 建立後才複製時，iOS 可能因為不是在點擊當下而拒絕
+      showToast(created ? "已建立，按「分享」複製訊息" : "複製失敗，請手動複製");
     }
   }
 
+  const live = codes.filter((c) => !isDead(c, nowMs));
+  const dead = codes.filter((c) => isDead(c, nowMs));
+
+  const card = (c: DoorCode) => (
+    <CodeCard
+      key={c.id}
+      c={c}
+      nowMs={nowMs}
+      toggling={togglingId === c.id}
+      onShare={() => share(c)}
+      onEdit={() => setEditTarget(c)}
+      onToggle={() => toggleActive(c)}
+      onDelete={() => setConfirmTarget(c)}
+    />
+  );
+
   return (
-    <div>
+    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] lg:gap-4">
+      {/* 電腦版：標題列右邊放新增；手機：整條按鈕 */}
+      <header className="col-span-full mb-2 hidden items-end justify-between gap-3 lg:flex">
+        <div>
+          <h1 className="text-[32px] font-bold leading-[44px]">訪客密碼</h1>
+          {!loading && (
+            <p className="text-[15px] text-muted">
+              {live.length} 組可用{dead.length > 0 && ` · ${dead.length} 組已失效`}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex h-12 items-center gap-2 rounded-[14px] bg-accent px-5 text-base font-bold text-white transition-colors hover:bg-accent-hover"
+        >
+          <PlusIcon size={18} />
+          新增密碼
+        </button>
+      </header>
       <button
         onClick={() => setShowCreate(true)}
-        className="mb-4 w-full rounded-2xl border border-dashed border-zinc-300 py-3 font-medium text-zinc-600 transition-colors hover:border-zinc-400 hover:bg-white dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-accent text-base font-bold text-white transition-colors hover:bg-accent-hover lg:hidden"
       >
-        ＋ 新增密碼
+        <PlusIcon size={16} />
+        新增密碼
       </button>
 
-      {/* 密碼清單 */}
       {loading ? (
-        <div className="flex flex-col gap-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900"
-            >
-              <div className="h-7 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-              <div className="mt-2 h-4 w-52 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-              <div className="mt-2 h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-              <div className="mt-3 h-8 w-20 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-            </div>
-          ))}
-        </div>
+        [0, 1, 2].map((i) => (
+          <div key={i} className="flex flex-col gap-2 rounded-[18px] border border-line bg-surface p-4">
+            <div className="h-6 w-28 animate-pulse rounded bg-ground" />
+            <div className="h-6 w-36 animate-pulse rounded bg-ground" />
+            <div className="h-4 w-52 animate-pulse rounded bg-ground" />
+            <div className="h-11 animate-pulse rounded-xl bg-ground" />
+          </div>
+        ))
       ) : codes.length === 0 ? (
-        <p className="text-center text-zinc-500">尚無密碼</p>
+        <p className="col-span-full py-8 text-center text-muted">還沒有訪客密碼</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {codes.map((c) => (
-            <CodeCard
-              key={c.id}
-              c={c}
-              nowMs={nowMs}
-              toggling={togglingId === c.id}
-              onShare={() => share(c)}
-              onEdit={() => setEditTarget(c)}
-              onToggle={() => toggleActive(c)}
-              onDelete={() => setConfirmTarget(c)}
-            />
-          ))}
-        </div>
+        <>
+          {live.map(card)}
+          {dead.length > 0 && (
+            <>
+              <h3 className="col-span-full mt-2 text-sm font-bold text-muted lg:mt-6 lg:text-[15px]">
+                已失效（{dead.length}）
+              </h3>
+              {dead.map(card)}
+            </>
+          )}
+        </>
       )}
 
       {/* 新增密碼 */}
       {showCreate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowCreate(false)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-                新增密碼
-              </h3>
-              <button
-                onClick={() => setShowCreate(false)}
-                className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
-              >
-                取消
-              </button>
-            </div>
-            <CodeForm
-              initial={EMPTY_FORM}
-              submitLabel="建立"
-              savingLabel="建立中…"
-              onSubmit={async (body) => {
-                const e = await handleCreate(body);
-                if (!e) setShowCreate(false);
-                return e;
-              }}
-            />
-          </div>
-        </div>
+        <Sheet title="新增訪客密碼" onClose={() => setShowCreate(false)}>
+          <CodeForm
+            initial={EMPTY_FORM}
+            submitLabel="建立並分享"
+            savingLabel="建立中…"
+            onSubmit={async (body) => {
+              const { error, created } = await handleCreate(body);
+              if (error) return error;
+              setShowCreate(false);
+              if (created) await share(created, true);
+              return null;
+            }}
+          />
+        </Sheet>
       )}
 
       {/* 編輯密碼 */}
       {editTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setEditTarget(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-                編輯密碼
-              </h3>
-              <button
-                onClick={() => setEditTarget(null)}
-                className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
-              >
-                取消
-              </button>
-            </div>
-            <CodeForm
-              initial={codeToForm(editTarget)}
-              submitLabel="儲存"
-              savingLabel="儲存中…"
-              onSubmit={async (body) => {
-                const e = await handleUpdate(editTarget.id, body);
-                if (!e) setEditTarget(null);
-                return e;
-              }}
-            />
-          </div>
-        </div>
+        <Sheet title="編輯訪客密碼" onClose={() => setEditTarget(null)}>
+          <CodeForm
+            initial={codeToForm(editTarget)}
+            submitLabel="儲存"
+            savingLabel="儲存中…"
+            onSubmit={async (body) => {
+              const e = await handleUpdate(editTarget.id, body);
+              if (!e) setEditTarget(null);
+              return e;
+            }}
+          />
+        </Sheet>
       )}
 
       {/* 刪除確認 */}
       {confirmTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
           onClick={() => setConfirmTarget(null)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+            className="w-full max-w-sm rounded-[20px] bg-surface p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-              確定刪除這組密碼？
+            <h3 id="delete-title" className="text-lg font-bold">
+              刪除「{confirmTarget.label}」？
             </h3>
-            <p className="mt-2 text-sm text-zinc-500">
-              <span className="font-mono">{confirmTarget.code}</span>
-              {confirmTarget.label ? `（${confirmTarget.label}）` : ""}
-              將被永久刪除，無法復原。
+            <p className="mt-2 text-[15px] leading-relaxed text-muted">
+              密碼 <span className="font-mono font-semibold text-ink">{confirmTarget.code}</span>{" "}
+              會永久刪除，無法復原。只是暫時不用的話，可以改成停用。
             </p>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2">
               <button
                 onClick={() => setConfirmTarget(null)}
-                className="rounded-xl border border-zinc-300 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="h-12 rounded-xl border border-line-strong text-[15px]"
               >
                 取消
               </button>
               <button
                 onClick={() => remove(confirmTarget)}
-                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+                className="h-12 rounded-xl bg-danger text-[15px] font-bold text-white"
               >
                 刪除
               </button>
@@ -229,6 +223,38 @@ export default function CodesTab({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 表單容器：手機全螢幕；電腦版從右側滑出，左邊還看得到密碼清單
+function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    // 點旁邊不關閉，避免填到一半誤觸弄丟
+    <div className="fixed inset-0 z-50 bg-ground lg:flex lg:justify-end lg:bg-black/25">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="mx-auto flex h-full max-w-md flex-col overflow-y-auto lg:mx-0 lg:w-[440px] lg:max-w-none lg:border-l lg:border-line lg:bg-ground lg:shadow-2xl"
+      >
+        <header className="grid grid-cols-[72px_1fr_72px] items-center px-3 pb-2 pt-3">
+          <button onClick={onClose} className="h-11 px-2 text-left text-base">
+            取消
+          </button>
+          <h2 className="text-center text-[17px] font-bold">{title}</h2>
+          <span />
+        </header>
+        {children}
+      </div>
     </div>
   );
 }

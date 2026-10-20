@@ -42,7 +42,7 @@ export default function WeekView({
   onTapEntry: (e: DayEntry) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-zinc-900">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface dark:bg-zinc-900">
       {/* 表頭：星期 + 日期 */}
       <div className="flex border-b border-zinc-100 dark:border-zinc-800">
         <div className="w-9 shrink-0" />

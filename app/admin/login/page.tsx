@@ -33,28 +33,51 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-zinc-100 px-6 py-12 dark:bg-zinc-950">
-      <main className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-xl shadow-zinc-200/60 dark:bg-zinc-900 dark:shadow-black/40">
-        <h1 className="mb-6 text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          管理員登入
-        </h1>
-        <div className="flex flex-col gap-4">
+    <div className="flex min-h-full flex-1 justify-center bg-ground">
+      <main className="flex w-full max-w-md flex-col gap-6 px-6 pb-8 pt-18">
+        <div
+          aria-hidden="true"
+          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink"
+        >
+          <div className="flex w-9 flex-col gap-1">
+            <div className="h-[5px] rounded-[1px] bg-ground" />
+            <div className="h-[5px] rounded-[1px] bg-ground" />
+            <div className="h-[5px] rounded-[1px] bg-ground" />
+            <div className="h-[3px] rounded-[1px] bg-[#E8590C]" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[30px] font-bold leading-tight">管理員登入</h1>
+          <p className="leading-relaxed text-muted">
+            管理訪客密碼、看開關門紀錄、遠端控制鐵捲門。
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <label htmlFor="admin-password" className="text-sm font-medium">
+            管理員密碼
+          </label>
           <input
+            id="admin-password"
             type="password"
             autoFocus
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleLogin();
             }}
-            placeholder="管理員密碼"
-            className="w-full rounded-2xl border border-zinc-300 bg-zinc-50 px-4 py-3 text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:focus:border-zinc-300"
+            className="h-13 w-full rounded-2xl border border-line-strong bg-surface px-4 text-[17px] outline-none focus:border-ink"
           />
-          {error && <p className="text-center text-sm text-red-500">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
           <button
             onClick={handleLogin}
             disabled={loading || !password}
-            className="w-full rounded-2xl bg-zinc-900 py-3 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="h-14 w-full rounded-2xl bg-ink text-[17px] font-bold text-white disabled:opacity-45"
           >
             {loading ? "登入中…" : "登入"}
           </button>

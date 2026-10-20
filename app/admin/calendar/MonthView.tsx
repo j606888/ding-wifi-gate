@@ -22,7 +22,7 @@ export default function MonthView({
   onTapDay: (d: MonthDay) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-zinc-900">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface dark:bg-zinc-900">
       <div className="grid grid-cols-7 border-b border-zinc-100 text-center text-xs text-zinc-400 dark:border-zinc-800">
         {WEEK_HEADER.map((w) => (
           <div key={w} className="py-2">

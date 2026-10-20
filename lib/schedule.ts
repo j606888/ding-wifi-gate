@@ -138,3 +138,46 @@ export function windowsForDate<T extends CodeRow>(
     { startMinute: (s - dayStart) / 60000, endMinute: (e - dayStart) / 60000 },
   ];
 }
+
+// ---- 後台顯示用：密碼目前的狀態、下一次開放時間 ----
+
+export type CodeStatus =
+  | "active" // 現在可用
+  | "upcoming" // 單次密碼，還沒開始
+  | "off_window" // 每週密碼，現在不在時段內
+  | "expired" // 單次密碼，已過期
+  | "disabled"; // 管理員停用
+
+export function codeStatus(
+  code: CodeRow & { is_active: boolean },
+  nowMs: number
+): CodeStatus {
+  if (!code.is_active) return "disabled";
+  if (evaluateCode(code, nowMs).valid) return "active";
+  if (code.recurrence === "weekly") return "off_window";
+  if (code.valid_from && Date.parse(code.valid_from) > nowMs) return "upcoming";
+  return "expired";
+}
+
+/**
+ * 下一次（或目前這一次）開放時段的開始時間；沒有下一次則回 null。
+ * weekly 往後找 7 天內第一個還沒結束的時段。
+ */
+export function nextWindowStartMs(code: CodeRow, nowMs: number): number | null {
+  if (code.recurrence === "weekly") {
+    const weekdays = code.weekdays ?? [];
+    const start = code.start_minute ?? 0;
+    const end = code.end_minute ?? 0;
+    if (weekdays.length === 0 || start >= end) return null;
+    for (let i = 0; i <= 7; i++) {
+      const date = getTaipeiDateParts(nowMs + i * DAY_MS);
+      if (!weekdays.includes(weekdayOf(date))) continue;
+      const dayStart = taipeiDayStartMs(date);
+      if (dayStart + end * 60_000 > nowMs) return dayStart + start * 60_000;
+    }
+    return null;
+  }
+  if (!code.valid_from || !code.valid_until) return null;
+  if (Date.parse(code.valid_until) <= nowMs) return null;
+  return Date.parse(code.valid_from);
+}

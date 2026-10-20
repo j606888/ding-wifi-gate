@@ -25,3 +25,21 @@ export function formatAccessTime(isoString: string, nowMs?: number): string {
   const min = String(taipeiDate.getUTCMinutes()).padStart(2, "0");
   return `${m}/${d} ${h}:${min}`;
 }
+
+// 網頁密碼開門的 display_name 存成「🔑 標籤」（LINE「誰來了」要用）；
+// 後台畫面另外畫鑰匙圖示，顯示時把前綴拿掉。
+export function stripKeyPrefix(displayName: string): string {
+  return displayName.replace(/^🔑\s*/u, "");
+}
+
+// 紀錄表格用：把 display_name 拆成「誰」和「用哪組密碼」。
+// 網頁密碼開門存成「🔑 小明（週二 Bachata 課）」或沒留名字的「🔑 週二 Bachata 課」（見 lib/guest-name.ts）。
+export function splitAccessName(
+  displayName: string,
+  isCode: boolean
+): { who: string; via: string } {
+  const name = stripKeyPrefix(displayName);
+  if (!isCode) return { who: name, via: "" };
+  const m = name.match(/^(.+)（(.+)）$/u);
+  return m ? { who: m[1], via: m[2] } : { who: "", via: name };
+}

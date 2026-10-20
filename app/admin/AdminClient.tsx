@@ -3,21 +3,51 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DoorCode } from "./shared";
+import ControlTab from "./control/ControlTab";
 import CodesTab from "./codes/CodesTab";
 import CalendarTab from "./calendar/CalendarTab";
 import LogsTab from "./logs/LogsTab";
+import {
+  CalendarIcon,
+  ClockIcon,
+  GarageIcon,
+  KeyIcon,
+  LogoutIcon,
+  SlidersIcon,
+} from "@/app/components/icons";
 
-type Tab = "codes" | "calendar" | "logs";
+// 手機：底部導覽 控制 / 紀錄 / 管理（管理裡再切 訪客密碼 / 日曆）
+// 電腦（lg 以上）：左側選單直接列出四個頁面
+type Tab = "control" | "logs" | "codes" | "calendar";
+type ManageTab = "codes" | "calendar";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "codes", label: "密碼" },
-  { key: "calendar", label: "日曆" },
-  { key: "logs", label: "紀錄" },
+const GATE_NAME = "丁宅鐵捲門";
+
+const MOBILE_TABS = [
+  { key: "control", label: "控制", Icon: GarageIcon },
+  { key: "logs", label: "紀錄", Icon: ClockIcon },
+  { key: "manage", label: "管理", Icon: SlidersIcon },
+] as const;
+
+const SIDEBAR_TABS: { key: Tab; label: string; Icon: typeof GarageIcon }[] = [
+  { key: "control", label: "控制", Icon: SlidersIcon },
+  { key: "logs", label: "紀錄", Icon: ClockIcon },
+  { key: "codes", label: "訪客密碼", Icon: KeyIcon },
+  { key: "calendar", label: "日曆", Icon: CalendarIcon },
 ];
+
+const MANAGE_TABS: { key: ManageTab; label: string }[] = [
+  { key: "codes", label: "訪客密碼" },
+  { key: "calendar", label: "日曆" },
+];
+
+const isManage = (t: Tab): t is ManageTab => t === "codes" || t === "calendar";
 
 export default function AdminClient() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("codes");
+  const [tab, setTab] = useState<Tab>("control");
+  // 手機按「管理」時回到上次看的子分頁
+  const [lastManage, setLastManage] = useState<ManageTab>("codes");
   const [codes, setCodes] = useState<DoorCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [nowMs] = useState(() => Date.now());
@@ -40,6 +70,11 @@ export default function AdminClient() {
     load();
   }, [load]);
 
+  function go(t: Tab) {
+    setTab(t);
+    if (isManage(t)) setLastManage(t);
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? "" : t)), 2000);
@@ -52,62 +87,153 @@ export default function AdminClient() {
   }
 
   return (
-    <div className="min-h-full bg-zinc-100 dark:bg-zinc-950">
-      {/* 通知 toast */}
+    <div className="flex min-h-full flex-1 flex-col bg-ground lg:flex-row">
+      {/* 通知 toast（手機在底部導覽上方） */}
       {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
-          <div className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-zinc-50 dark:text-zinc-900">
+        <div className="pointer-events-none fixed inset-x-0 bottom-28 z-[60] flex justify-center px-4 lg:bottom-8">
+          <div className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg">
             {toast}
           </div>
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-2xl px-4 py-8">
-        <div className="mb-5 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-            密碼管理
-          </h1>
-          <button
-            onClick={logout}
-            className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
-          >
-            登出
-          </button>
+      {/* 電腦版左側選單 */}
+      <nav
+        aria-label="後台"
+        className="sticky top-0 hidden h-screen w-58 shrink-0 flex-col gap-7 border-r border-line bg-faded px-4 py-7 lg:flex"
+      >
+        <div className="flex items-center gap-3 px-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink text-white">
+            <GarageIcon size={22} strokeWidth={1.8} />
+          </span>
+          <span className="flex flex-col">
+            <span className="font-bold">{GATE_NAME}</span>
+            <span className="text-[13px] text-muted">後台</span>
+          </span>
         </div>
-
-        {/* 分頁切換 */}
-        <div className="sticky top-0 z-30 -mx-4 mb-6 bg-zinc-100/90 px-4 py-2 backdrop-blur dark:bg-zinc-950/90">
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-200/70 p-1 dark:bg-zinc-800">
-            {TABS.map((t) => (
+        <div className="flex flex-col gap-1">
+          {SIDEBAR_TABS.map(({ key, label, Icon }) => {
+            const on = tab === key;
+            return (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`rounded-lg py-2 text-sm font-medium transition-colors ${
-                  tab === t.key
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-zinc-50"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                key={key}
+                onClick={() => go(key)}
+                aria-current={on ? "page" : undefined}
+                className={`flex h-11 items-center gap-3 rounded-xl px-3 text-left text-[15px] transition-colors ${
+                  on
+                    ? "bg-surface font-bold text-ink shadow-sm"
+                    : "text-subtle hover:bg-surface/60 hover:text-ink"
                 }`}
               >
-                {t.label}
+                <Icon size={20} strokeWidth={1.8} />
+                {label}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
+        <div className="flex-1" />
+        <button
+          onClick={logout}
+          className="flex h-11 items-center gap-3 rounded-xl px-3 text-left text-[15px] text-muted hover:bg-surface/60 hover:text-ink"
+        >
+          <LogoutIcon size={20} />
+          登出
+        </button>
+      </nav>
 
-        {tab === "codes" && (
-          <CodesTab
+      <div className="mx-auto w-full max-w-xl flex-1 px-5 pb-32 pt-5 lg:max-w-[1120px] lg:px-12 lg:pb-14 lg:pt-10">
+        {tab === "control" && (
+          <ControlTab
             codes={codes}
-            loading={loading}
-            load={load}
+            codesLoading={loading}
             nowMs={nowMs}
-            showToast={showToast}
+            onShowLogs={() => go("logs")}
+            onShowCodes={() => go("codes")}
           />
         )}
-        {tab === "calendar" && (
-          <CalendarTab codes={codes} nowMs={nowMs} showToast={showToast} />
+
+        {tab === "logs" && (
+          <>
+            <div className="mb-3.5 lg:mb-6">
+              <h1 className="text-2xl font-bold leading-[44px] lg:text-[32px]">紀錄</h1>
+              <p className="hidden text-[15px] text-muted lg:block">
+                每一次開門、關門、停止，和被擋下來的嘗試
+              </p>
+            </div>
+            <LogsTab />
+          </>
         )}
-        {tab === "logs" && <LogsTab />}
+
+        {isManage(tab) && (
+          <>
+            {/* 手機：管理標題＋登出＋子分頁切換；電腦版由左側選單取代 */}
+            <div className="lg:hidden">
+              <div className="mb-3.5 flex items-center justify-between">
+                <h1 className="text-2xl font-bold leading-[44px]">管理</h1>
+                <button
+                  onClick={logout}
+                  className="h-11 px-2 text-[15px] text-muted hover:text-ink"
+                >
+                  登出
+                </button>
+              </div>
+              <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-sunken p-1">
+                {MANAGE_TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => go(t.key)}
+                    aria-pressed={tab === t.key}
+                    className={`h-9 rounded-[9px] text-sm transition-colors ${
+                      tab === t.key
+                        ? "bg-surface font-bold text-ink"
+                        : "text-subtle hover:text-ink"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {tab === "codes" && (
+              <CodesTab
+                codes={codes}
+                loading={loading}
+                load={load}
+                nowMs={nowMs}
+                showToast={showToast}
+              />
+            )}
+            {tab === "calendar" && (
+              <>
+                <h1 className="mb-6 hidden text-[32px] font-bold leading-[44px] lg:block">日曆</h1>
+                <CalendarTab codes={codes} nowMs={nowMs} showToast={showToast} />
+              </>
+            )}
+          </>
+        )}
       </div>
+
+      {/* 手機底部導覽 */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[max(env(safe-area-inset-bottom),16px)] pt-1.5 lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-3">
+          {MOBILE_TABS.map(({ key, label, Icon }) => {
+            const on = key === "manage" ? isManage(tab) : tab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => go(key === "manage" ? lastManage : key)}
+                aria-current={on ? "page" : undefined}
+                className={`flex flex-col items-center gap-0.5 p-1.5 text-xs ${
+                  on ? "font-bold text-accent" : "text-muted"
+                }`}
+              >
+                <Icon size={24} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
