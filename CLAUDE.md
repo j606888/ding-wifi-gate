@@ -52,7 +52,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
    - 目前裸線外露，需裝入盒子保護
    - 規劃：找適合的塑膠盒，固定 ESP32 + 繼電器模組，線路整齊收納
 
-2. **多租戶第一步部署（gates）**：先在 Supabase SQL Editor 跑 `scripts/schema.sql`（第 5 段建 `gates`、補 `gate_id`），**再**部署程式，順序反了 API 會因為找不到預設 gate 而壞掉
+2. **多租戶第一步部署（gates）**：`scripts/schema.sql` 第 5 段已在 Supabase 跑過（2026-10-22），剩合併 `feature/gates` 部署
 
 3. **密碼網頁開門部署**
    - 在 Supabase SQL Editor 執行 `scripts/schema.sql`
