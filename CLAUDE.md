@@ -52,7 +52,9 @@ ESP32（家裡，長連線訂閱 home/garage topic）
    - 目前裸線外露，需裝入盒子保護
    - 規劃：找適合的塑膠盒，固定 ESP32 + 繼電器模組，線路整齊收納
 
-2. **密碼網頁開門部署**
+2. **多租戶第一步部署（gates）**：先在 Supabase SQL Editor 跑 `scripts/schema.sql`（第 5 段建 `gates`、補 `gate_id`），**再**部署程式，順序反了 API 會因為找不到預設 gate 而壞掉
+
+3. **密碼網頁開門部署**
    - 在 Supabase SQL Editor 執行 `scripts/schema.sql`
    - Vercel 環境變數加上 `ADMIN_PASSWORD`、`APP_SECRET`
 
@@ -71,7 +73,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 完整密碼在 `.env.local`（不進 git）。需要的環境變數：
 - `LINE_CHANNEL_SECRET`
 - `LINE_CHANNEL_ACCESS_TOKEN`
-- `MQTT_HOST` / `MQTT_PORT` / `MQTT_USERNAME` / `MQTT_PASSWORD` / `MQTT_TOPIC`
+- `MQTT_HOST` / `MQTT_PORT` / `MQTT_USERNAME` / `MQTT_PASSWORD`（topic 改存在 `gates.mqtt_topic`，`MQTT_TOPIC` 已不使用）
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_PASSWORD`（後台 `/admin` 登入密碼）
@@ -116,7 +118,8 @@ ding-wifi-gate/
 │               └── [id]/route.ts  # PATCH 編輯/停用 / DELETE 刪除
 ├── lib/
 │   ├── supabase.ts        # Supabase client
-│   ├── mqtt.ts            # publishMQTT（共用）
+│   ├── mqtt.ts            # publishMQTT(gate, action)（共用）
+│   ├── gates.ts           # getDefaultGate / getGateById（多租戶的門）
 │   ├── guest-name.ts      # 訪客名字：清理、顯示名稱、localStorage（client-safe）
 │   ├── access.ts          # logAccess / notifyBark / sendBark / ACTION_LABEL（共用）
 │   ├── line.ts            # LINE 回覆/推播/個人資料/個人 Rich Menu 切換
@@ -161,6 +164,19 @@ ding-wifi-gate/
 鐵捲門控制器端子台標籤（由左到右）：上 / 下 / 停 / 單 / 外線 / 紅外線 / 鍵
 
 ## Supabase 資料表
+
+### `gates`（多租戶：每扇門一筆）
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `id` | uuid | 主鍵 |
+| `slug` | text | 唯一；自家的門是 `home`（預設 gate） |
+| `name` | text | 顯示名稱 |
+| `mqtt_topic` | text | ESP32 訂閱的 topic（預設 gate 是 `home/garage`） |
+| `created_at` | timestamptz | 建立時間 |
+
+> `door_codes`、`access_logs`、`activation_codes` 都有 `gate_id`（not null，預設值 `default_gate_id()` = 預設 gate）。
+> LINE Bot、公開密碼頁 `/`、後台目前都只服務預設 gate；`users`（LINE 成員）也是對預設 gate 的開通狀態。
+> 關門 token 簽了 `gateId`，舊 token 沒有就當預設 gate。
 
 ### `users`
 | 欄位 | 型別 | 說明 |

@@ -1,23 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
 
   const { data: codes } = await supabase
     .from("door_codes")
     .select(
       "id, code, label, recurrence, weekdays, start_minute, end_minute, valid_from, valid_until, is_active, created_at"
     )
+    .eq("gate_id", gate.id)
     .order("created_at", { ascending: false });
 
   // 統計每組密碼成功開門次數
   const { data: logs } = await supabase
     .from("access_logs")
     .select("code_id")
+    .eq("gate_id", gate.id)
     .eq("source", "web")
     .eq("action", "open")
     .eq("status", "success")
@@ -40,6 +44,7 @@ export async function POST(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
 
   const body = await req.json().catch(() => ({}));
   const { code, label, recurrence } = body;
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("door_codes")
-    .insert(insert)
+    .insert({ ...insert, gate_id: gate.id })
     .select()
     .single();
 

@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
 import { logAccess, notifyBark } from "@/lib/access";
 import { signToken } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 import { evaluateCode } from "@/lib/schedule";
 import { windowSummary } from "@/lib/code-format";
 import { cleanGuestName, guestDisplayName } from "@/lib/guest-name";
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 公開密碼頁目前只服務預設 gate
+  const gate = await getDefaultGate();
+
   // 驗證密碼：正確、啟用中、現在落在可用時段內（單次或每週，於 JS 判斷）。
   // 不在 SQL 過濾 is_active，改在 JS 判斷，才能區分「查無此碼/已停用」與「時段外」。
   const { data: rows } = await supabase
@@ -50,6 +54,7 @@ export async function POST(req: NextRequest) {
     .select(
       "id, label, recurrence, weekdays, start_minute, end_minute, valid_from, valid_until, is_active"
     )
+    .eq("gate_id", gate.id)
     .eq("code", code)
     .order("created_at", { ascending: false });
 
@@ -88,13 +93,14 @@ export async function POST(req: NextRequest) {
 
   // 開門
   try {
-    await publishMQTT("open");
+    await publishMQTT(gate, "open");
   } catch {
     return NextResponse.json({ error: "發送失敗，請稍後再試" }, { status: 502 });
   }
 
   const displayName = guestDisplayName(codeRow.label, name);
   await logAccess({
+    gateId: gate.id,
     action: "open",
     status: "success",
     displayName,
@@ -106,7 +112,7 @@ export async function POST(req: NextRequest) {
   // 關門 token：min(30 分, 本次時段結束時間)
   const ttl = Math.max(0, Math.min(CLOSE_TOKEN_TTL_MS, windowEndMs - now));
   const token = signToken(
-    { codeId: codeRow.id, label: codeRow.label, name },
+    { gateId: gate.id, codeId: codeRow.id, label: codeRow.label, name },
     ttl,
     now
   );

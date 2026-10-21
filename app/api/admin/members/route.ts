@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 
 // 後台 LINE 成員頁：所有加過好友的人 + 上次成功操作時間 + 最近的啟動碼
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  // users 表（LINE 成員）目前只對應預設 gate
+  const gate = await getDefaultGate();
 
   const [{ data: users, error }, { data: logs }, { data: codes }] = await Promise.all([
     supabase
@@ -18,6 +21,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from("access_logs")
       .select("line_user_id, created_at")
+      .eq("gate_id", gate.id)
       .eq("status", "success")
       .not("line_user_id", "is", null)
       .order("created_at", { ascending: false })
@@ -25,6 +29,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from("activation_codes")
       .select("*")
+      .eq("gate_id", gate.id)
       .order("created_at", { ascending: false })
       .limit(20),
   ]);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 import { publishMQTT } from "@/lib/mqtt";
+import { getDefaultGate } from "@/lib/gates";
 import {
   ACTION_LABEL,
   formatAccessTime,
@@ -93,12 +94,13 @@ async function getOrCreateUser(lineUserId: string): Promise<LineUser> {
   return { displayName, is_active: false, is_admin: false, requested_at: null, isNew: true };
 }
 
-async function getLatestAccessLogs(): Promise<
+async function getLatestAccessLogs(gateId: string): Promise<
   { display_name: string; action: string; created_at: string }[]
 > {
   const { data } = await supabase
     .from("access_logs")
     .select("display_name, action, created_at")
+    .eq("gate_id", gateId)
     .eq("status", "success")
     .order("created_at", { ascending: false })
     .limit(5);
@@ -122,6 +124,8 @@ export async function POST(req: NextRequest) {
   }
 
   const { events } = JSON.parse(body);
+  // LINE Bot 只服務預設 gate；users 表的開通狀態也是對這扇門
+  const gate = await getDefaultGate();
 
   for (const event of events) {
     const lineUserId: string = event.source.userId;
@@ -146,13 +150,13 @@ export async function POST(req: NextRequest) {
     const { displayName } = user;
 
     if (!user.is_active) {
-      await handleInactive(event.replyToken, lineUserId, user, text, action);
+      await handleInactive(event.replyToken, gate.id, lineUserId, user, text, action);
       continue;
     }
 
     // 「誰來了」「後台」只給管理員；其他人當成一般訊息
     if (user.is_admin && text === "誰來了") {
-      await replyWhoCame(event.replyToken);
+      await replyWhoCame(event.replyToken, gate.id);
       continue;
     }
     if (user.is_admin && (text === "後台" || text.toLowerCase() === "admin")) {
@@ -176,8 +180,8 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await publishMQTT(action);
-      await logAccess({ lineUserId, displayName, action, status: "success" });
+      await publishMQTT(gate, action);
+      await logAccess({ gateId: gate.id, lineUserId, displayName, action, status: "success" });
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
       await notifyBark(displayName, action).catch(() => {});
     } catch {
@@ -191,6 +195,7 @@ export async function POST(req: NextRequest) {
 // 還沒開通的人：輸入啟動碼 / 申請使用 / 按開門（記成申請）/ 其他訊息（再講一次怎麼用）
 async function handleInactive(
   replyToken: string,
+  gateId: string,
   lineUserId: string,
   user: LineUser,
   text: string,
@@ -208,7 +213,7 @@ async function handleInactive(
       await replyMessage(replyToken, "輸入錯誤太多次，請 10 分鐘後再試。");
       return;
     }
-    const code = await redeemActivationCode(lineUserId, text);
+    const code = await redeemActivationCode(gateId, lineUserId, text);
     if (!code) {
       await replyMessage(replyToken, "啟動碼不正確或已經過期，請跟屋主確認。");
       return;
@@ -224,7 +229,7 @@ async function handleInactive(
 
   if (text === APPLY_TEXT || action) {
     if (action) {
-      await logAccess({ lineUserId, displayName, action, status: "denied" });
+      await logAccess({ gateId, lineUserId, displayName, action, status: "denied" });
     }
     const fresh = await markRequested(
       lineUserId,
@@ -246,8 +251,8 @@ async function handleInactive(
   await replyMessage(replyToken, WELCOME_TEXT(displayName));
 }
 
-async function replyWhoCame(replyToken: string): Promise<void> {
-  const logs = await getLatestAccessLogs();
+async function replyWhoCame(replyToken: string, gateId: string): Promise<void> {
+  const logs = await getLatestAccessLogs(gateId);
   if (logs.length === 0) {
     await replyMessage(replyToken, "目前沒有開門紀錄");
     return;

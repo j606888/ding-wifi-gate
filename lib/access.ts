@@ -5,6 +5,7 @@ import { ACTION_LABEL } from "@/lib/access-format";
 export { ACTION_LABEL, formatAccessTime } from "@/lib/access-format";
 
 type LogAccessParams = {
+  gateId: string;
   action: string;
   status: "success" | "denied";
   displayName: string;
@@ -15,6 +16,7 @@ type LogAccessParams = {
 
 export async function logAccess(params: LogAccessParams): Promise<void> {
   await supabase.from("access_logs").insert({
+    gate_id: params.gateId,
     line_user_id: params.lineUserId ?? null,
     display_name: params.displayName,
     action: params.action,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { publishMQTT, type GarageAction } from "@/lib/mqtt";
 import { logAccess, notifyBark } from "@/lib/access";
 import { verifyToken } from "@/lib/auth";
+import { getDefaultGate, getGateById } from "@/lib/gates";
 import { cleanGuestName, guestDisplayName } from "@/lib/guest-name";
 
 export async function POST(req: NextRequest) {
@@ -20,18 +21,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 舊 token（加 gate 之前簽的）沒有 gateId → 預設 gate
+  const gate =
+    typeof payload.gateId === "string"
+      ? await getGateById(payload.gateId)
+      : await getDefaultGate();
+  if (!gate) {
+    return NextResponse.json({ error: "找不到這扇門" }, { status: 404 });
+  }
+
   const codeId = payload.codeId as number;
   const label = (payload.label as string) ?? "";
   // 名字在開門時簽進 token，關門/停止的紀錄跟著帶上
   const displayName = guestDisplayName(label, cleanGuestName(payload.name));
 
   try {
-    await publishMQTT(action);
+    await publishMQTT(gate, action);
   } catch {
     return NextResponse.json({ error: "發送失敗，請稍後再試" }, { status: 502 });
   }
 
   await logAccess({
+    gateId: gate.id,
     action,
     status: "success",
     displayName,

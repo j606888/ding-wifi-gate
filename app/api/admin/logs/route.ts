@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 
 const ACTIONS = ["open", "close", "stop"];
 const STATUSES = ["success", "denied"];
@@ -10,6 +11,7 @@ export async function GET(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
 
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
@@ -19,6 +21,7 @@ export async function GET(req: NextRequest) {
   let q = supabase
     .from("access_logs")
     .select("id, display_name, action, status, source, code_id, created_at")
+    .eq("gate_id", gate.id)
     .order("created_at", { ascending: false })
     .limit(200);
 
