@@ -52,7 +52,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
    - 目前裸線外露，需裝入盒子保護
    - 規劃：找適合的塑膠盒，固定 ESP32 + 繼電器模組，線路整齊收納
 
-2. **App 帳號部署**：`scripts/schema.sql` 第 6、7 段已在 Supabase 跑過（2026-10-22）。Vercel 要加 `DATABASE_URL`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`；Apple 登入要先到 Apple Developer 建 Services ID / Key 再加 `APPLE_*`
+2. **App 帳號部署**：SQL（第 6、7 段）、Vercel 環境變數（`DATABASE_URL`、`BETTER_AUTH_*`、`APPLE_*`）都已設定（2026-10-22），剩合併 `feature/accounts` 部署。Apple 網頁登入只有正式站能走完（Return URL 只登記正式網域）
 
 3. **密碼網頁開門部署**
    - 在 Supabase SQL Editor 執行 `scripts/schema.sql`
@@ -69,6 +69,10 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 | LINE Channel ID | `2010306542` |
 | ESP32 Wi-Fi SSID | `james` |
 | Supabase URL | `SUPABASE_URL` in `.env.local` |
+| Apple Team ID | `MU75KPDK26` |
+| iOS Bundle ID | `com.wifigate.app`（App ID「WiFi Gate」，Sign in with Apple primary） |
+| Apple Services ID | `com.wifigate.web`（網頁 Apple 登入；Return URL `https://ding-wifi-gate.vercel.app/api/auth/callback/apple`） |
+| Apple Key ID | `BDNA53MGXA`（Sign in with Apple；`.p8` 只能下載一次，自己備份） |
 
 完整密碼在 `.env.local`（不進 git）。需要的環境變數：
 - `LINE_CHANNEL_SECRET`
