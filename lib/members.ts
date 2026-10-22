@@ -88,6 +88,7 @@ export async function redeemBlocked(lineUserId: string): Promise<boolean> {
  * 次數用「used_count 沒被改過才更新」的方式避免兩人同時兌換最後一次。
  */
 export async function redeemActivationCode(
+  gateId: string,
   lineUserId: string,
   code: string
 ): Promise<ActivationCodeRow | null> {
@@ -95,6 +96,7 @@ export async function redeemActivationCode(
   const { data: rows } = await supabase
     .from("activation_codes")
     .select("*")
+    .eq("gate_id", gateId)
     .eq("code", code)
     .is("revoked_at", null)
     .gt("expires_at", new Date(now).toISOString())
@@ -115,11 +117,12 @@ export async function redeemActivationCode(
   return null;
 }
 
-/** 產生一組目前沒有在用的 6 位數啟動碼。 */
-export async function generateActivationCode(): Promise<string> {
+/** 產生一組這扇門目前沒有在用的 6 位數啟動碼。 */
+export async function generateActivationCode(gateId: string): Promise<string> {
   const { data } = await supabase
     .from("activation_codes")
     .select("code")
+    .eq("gate_id", gateId)
     .is("revoked_at", null)
     .gt("expires_at", new Date().toISOString());
   const taken = new Set((data ?? []).map((r) => r.code));

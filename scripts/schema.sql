@@ -67,6 +67,45 @@ create table if not exists activation_codes (
 create index if not exists activation_codes_code_idx on activation_codes (code);
 create index if not exists access_logs_line_user_idx on access_logs (line_user_id, created_at desc);
 
+-- 5) 多租戶：每扇門一筆 gates，門相關的資料都掛 gate_id
+create extension if not exists pgcrypto;
+
+create table if not exists gates (
+  id         uuid        primary key default gen_random_uuid(),
+  slug       text        not null unique,            -- 網址用，例如 /g/home（之後）
+  name       text        not null,                   -- 顯示名稱
+  mqtt_topic text        not null unique,            -- ESP32 訂閱的 topic
+  created_at timestamptz not null default now()
+);
+
+-- 自家的門 = 預設 gate；LINE Bot、公開密碼頁、後台目前都只服務它
+insert into gates (slug, name, mqtt_topic)
+values ('home', '丁宅鐵捲門', 'home/garage')
+on conflict (slug) do nothing;
+
+-- 欄位預設值指向預設 gate：先跑 SQL、後部署程式也不會寫入失敗
+create or replace function default_gate_id() returns uuid
+language sql stable as $$ select id from gates where slug = 'home' $$;
+
+alter table door_codes       add column if not exists gate_id uuid references gates(id) on delete cascade;
+alter table access_logs      add column if not exists gate_id uuid references gates(id) on delete cascade;
+alter table activation_codes add column if not exists gate_id uuid references gates(id) on delete cascade;
+
+update door_codes       set gate_id = default_gate_id() where gate_id is null;
+update access_logs      set gate_id = default_gate_id() where gate_id is null;
+update activation_codes set gate_id = default_gate_id() where gate_id is null;
+
+alter table door_codes       alter column gate_id set default default_gate_id();
+alter table access_logs      alter column gate_id set default default_gate_id();
+alter table activation_codes alter column gate_id set default default_gate_id();
+alter table door_codes       alter column gate_id set not null;
+alter table access_logs      alter column gate_id set not null;
+alter table activation_codes alter column gate_id set not null;
+
+create index if not exists door_codes_gate_code_idx       on door_codes (gate_id, code);
+create index if not exists access_logs_gate_time_idx      on access_logs (gate_id, created_at desc);
+create index if not exists activation_codes_gate_code_idx on activation_codes (gate_id, code);
+
 -- 把自己設成管理員（換成你的 LINE userId，可在 users 表找到）
 -- update users set is_admin = true where line_user_id = 'Uxxxxxxxx';
 

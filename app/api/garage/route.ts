@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishMQTT } from "@/lib/mqtt";
+import { getDefaultGate } from "@/lib/gates";
 
 export async function POST(req: NextRequest) {
   const { action } = await req.json();
@@ -8,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid action" }, { status: 400 });
   }
 
-  await publishMQTT(action);
+  await publishMQTT(await getDefaultGate(), action);
 
   return NextResponse.json({ status: "ok", action });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 import { generateActivationCode } from "@/lib/members";
 
 const USES = [1, 5, null];
@@ -11,6 +12,7 @@ export async function POST(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
   const body = await req.json().catch(() => ({}));
   const maxUses = body.maxUses ?? null;
   if (!USES.includes(maxUses) || !TTL_HOURS.includes(body.ttlHours)) {
@@ -21,7 +23,8 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("activation_codes")
     .insert({
-      code: await generateActivationCode(),
+      gate_id: gate.id,
+      code: await generateActivationCode(gate.id),
       label,
       max_uses: maxUses,
       expires_at: new Date(Date.now() + body.ttlHours * 60 * 60 * 1000).toISOString(),

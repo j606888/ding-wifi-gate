@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/auth";
+import { getDefaultGate } from "@/lib/gates";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,6 +10,7 @@ export async function PATCH(
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -40,6 +42,7 @@ export async function PATCH(
     .from("door_codes")
     .update(update)
     .eq("id", id)
+    .eq("gate_id", gate.id)
     .select()
     .single();
 
@@ -56,9 +59,14 @@ export async function DELETE(
   if (!requireAdmin(req, Date.now())) {
     return NextResponse.json({ error: "未授權" }, { status: 401 });
   }
+  const gate = await getDefaultGate();
   const { id } = await params;
 
-  const { error } = await supabase.from("door_codes").delete().eq("id", id);
+  const { error } = await supabase
+    .from("door_codes")
+    .delete()
+    .eq("id", id)
+    .eq("gate_id", gate.id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

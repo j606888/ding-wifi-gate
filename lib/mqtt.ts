@@ -1,7 +1,7 @@
 import mqtt from "mqtt";
+import type { Gate } from "@/lib/gates";
 
 const MQTT_URL = `mqtts://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`;
-const TOPIC = process.env.MQTT_TOPIC!;
 
 export type GarageAction = "open" | "close" | "stop";
 
@@ -9,9 +9,9 @@ export type GarageAction = "open" | "close" | "stop";
 // 讓本機能跑完整流程測試開/關門畫面，鐵門不會動。
 const DRY_RUN = /^(1|true)$/i.test(process.env.MQTT_DRY_RUN ?? "");
 
-export async function publishMQTT(action: string): Promise<void> {
+export async function publishMQTT(gate: Gate, action: string): Promise<void> {
   if (DRY_RUN) {
-    console.log(`[MQTT dry-run] 略過發送，action=${action}`);
+    console.log(`[MQTT dry-run] 略過發送，topic=${gate.mqtt_topic} action=${action}`);
     return;
   }
   return new Promise((resolve, reject) => {
@@ -21,7 +21,7 @@ export async function publishMQTT(action: string): Promise<void> {
       rejectUnauthorized: false,
     });
     client.on("connect", () => {
-      client.publish(TOPIC, action, { qos: 1 }, (err) => {
+      client.publish(gate.mqtt_topic, action, { qos: 1 }, (err) => {
         client.end();
         if (err) reject(err);
         else resolve();
