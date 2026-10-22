@@ -52,7 +52,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
    - 目前裸線外露，需裝入盒子保護
    - 規劃：找適合的塑膠盒，固定 ESP32 + 繼電器模組，線路整齊收納
 
-2. **多租戶第一步部署（gates）**：`scripts/schema.sql` 第 5 段已在 Supabase 跑過（2026-10-22），剩合併 `feature/gates` 部署
+2. **App 帳號部署**：`scripts/schema.sql` 第 6、7 段已在 Supabase 跑過（2026-10-22）。Vercel 要加 `DATABASE_URL`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`；Apple 登入要先到 Apple Developer 建 Services ID / Key 再加 `APPLE_*`
 
 3. **密碼網頁開門部署**
    - 在 Supabase SQL Editor 執行 `scripts/schema.sql`
@@ -82,6 +82,9 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `BARK_SERVER`（選填，自架 Bark 伺服器；預設 `https://api.day.app`）
 - `MQTT_DRY_RUN`（選填，設 `1`/`true` 時只印 log 不真的發 MQTT，本機測試開/關門流程用，鐵門不會動）
 - `LINE_RICH_MENU_BOUND_ID`（「已綁定」Rich Menu 的 ID，`scripts/setup_rich_menu.sh` 跑完會印出；沒設時開通不會換選單）
+- `DATABASE_URL`（Supabase pooler transaction mode，port 6543；Better Auth 直連 Postgres 用）
+- `BETTER_AUTH_SECRET`（App 帳號 session 簽章）/ `BETTER_AUTH_URL`（正式站網址）
+- `APPLE_CLIENT_ID`（Services ID）/ `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY`（換行存成 `\n`）/ `APPLE_APP_BUNDLE_IDENTIFIER`：Sign in with Apple，沒設就只有 Email 登入
 - `LINE_ADD_FRIEND_URL`（選填，LINE 加好友連結，放進啟動碼的分享訊息）
 
 ## 檔案結構
@@ -104,6 +107,8 @@ ding-wifi-gate/
 │   └── api/
 │       ├── garage/route.ts        # POST /api/garage - 直接觸發（測試用）
 │       ├── webhook/route.ts       # POST /api/webhook - LINE Bot 入口
+│       ├── auth/[...all]/route.ts # Better Auth（註冊、登入、Apple callback、App idToken 登入）
+│       ├── app/v1/account/route.ts # GET 我的帳號 / DELETE 刪除帳號（iOS App，Bearer token）
 │       ├── door/
 │       │   ├── verify/route.ts    # POST - 驗密碼＋開門，回關門 token
 │       │   └── close/route.ts     # POST - 用 token 關門或緊急停止（action: close/stop）
@@ -120,6 +125,10 @@ ding-wifi-gate/
 │   ├── supabase.ts        # Supabase client
 │   ├── mqtt.ts            # publishMQTT(gate, action)（共用）
 │   ├── gates.ts           # getDefaultGate / getGateById（多租戶的門）
+│   ├── db.ts              # pg Pool（DATABASE_URL，給 Better Auth）
+│   ├── user-auth.ts       # Better Auth：Email／密碼 + Sign in with Apple + bearer（App 帳號）
+│   ├── accounts.ts        # requireAppUser（App API 驗 bearer）/ deleteAccount（含撤銷 Apple）
+│   ├── apple.ts           # Apple client secret JWT / 撤銷授權
 │   ├── guest-name.ts      # 訪客名字：清理、顯示名稱、localStorage（client-safe）
 │   ├── access.ts          # logAccess / notifyBark / sendBark / ACTION_LABEL（共用）
 │   ├── line.ts            # LINE 回覆/推播/個人資料/個人 Rich Menu 切換
@@ -177,6 +186,10 @@ ding-wifi-gate/
 > `door_codes`、`access_logs`、`activation_codes` 都有 `gate_id`（not null，預設值 `default_gate_id()` = 預設 gate）。
 > LINE Bot、公開密碼頁 `/`、後台目前都只服務預設 gate；`users`（LINE 成員）也是對預設 gate 的開通狀態。
 > 關門 token 簽了 `gateId`，舊 token 沒有就當預設 gate。
+
+### `auth_users` / `auth_sessions` / `auth_accounts` / `auth_verifications`（App 帳號）
+Better Auth 的表（欄位 camelCase，SQL 在 `scripts/schema.sql` 第 6 段）。跟 LINE 成員的 `users` 是兩套，之後用 `gate_members` 連到門。
+所有本專案的表都開了 RLS 且沒有 policy：只有 service role 和直連 Postgres 讀得到。
 
 ### `users`
 | 欄位 | 型別 | 說明 |

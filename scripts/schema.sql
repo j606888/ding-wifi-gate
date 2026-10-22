@@ -106,6 +106,26 @@ create index if not exists door_codes_gate_code_idx       on door_codes (gate_id
 create index if not exists access_logs_gate_time_idx      on access_logs (gate_id, created_at desc);
 create index if not exists activation_codes_gate_code_idx on activation_codes (gate_id, code);
 
+-- 6) App 帳號（Better Auth，lib/user-auth.ts）。欄位名稱是 Better Auth 的 camelCase，
+--    SQL 由 better-auth/db/migration 產生，改設定後要重新產生對照
+create table if not exists "auth_users" ("id" uuid default pg_catalog.gen_random_uuid() not null primary key, "name" text not null, "email" text not null unique, "emailVerified" boolean not null, "image" text, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz default CURRENT_TIMESTAMP not null);
+create table if not exists "auth_sessions" ("id" uuid default pg_catalog.gen_random_uuid() not null primary key, "expiresAt" timestamptz not null, "token" text not null unique, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz not null, "ipAddress" text, "userAgent" text, "userId" uuid not null references "auth_users" ("id") on delete cascade);
+create table if not exists "auth_accounts" ("id" uuid default pg_catalog.gen_random_uuid() not null primary key, "accountId" text not null, "providerId" text not null, "userId" uuid not null references "auth_users" ("id") on delete cascade, "accessToken" text, "refreshToken" text, "idToken" text, "accessTokenExpiresAt" timestamptz, "refreshTokenExpiresAt" timestamptz, "scope" text, "password" text, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz not null);
+create table if not exists "auth_verifications" ("id" uuid default pg_catalog.gen_random_uuid() not null primary key, "identifier" text not null, "value" text not null, "expiresAt" timestamptz not null, "createdAt" timestamptz default CURRENT_TIMESTAMP not null, "updatedAt" timestamptz default CURRENT_TIMESTAMP not null);
+create index if not exists "auth_sessions_userId_idx" on "auth_sessions" ("userId");
+create index if not exists "auth_accounts_userId_idx" on "auth_accounts" ("userId");
+create index if not exists "auth_verifications_identifier_idx" on "auth_verifications" ("identifier");
+
+-- 7) RLS：程式只用 service role（supabase-js）和直連 Postgres（Better Auth），兩者都不受 RLS 限制。
+--    打開 RLS、不給 policy = anon key 什麼都讀不到（auth 表有密碼雜湊和 session token）
+alter table auth_users         enable row level security;
+alter table auth_sessions      enable row level security;
+alter table auth_accounts      enable row level security;
+alter table auth_verifications enable row level security;
+alter table gates              enable row level security;
+alter table access_logs        enable row level security;
+alter table users              enable row level security;
+
 -- 把自己設成管理員（換成你的 LINE userId，可在 users 表找到）
 -- update users set is_admin = true where line_user_id = 'Uxxxxxxxx';
 
