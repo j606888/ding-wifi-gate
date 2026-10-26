@@ -97,6 +97,17 @@ export default function AdminClient() {
     loadMembers();
   }, [load, loadMembers]);
 
+  // 從主畫面打開時沒有網址列可以重新整理：切回來就重抓密碼和成員（等待開通數字才會更新）
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      load();
+      loadMembers();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load, loadMembers]);
+
   const pendingCount = members.filter(isPending).length;
 
   function go(t: Tab) {
@@ -178,7 +189,7 @@ export default function AdminClient() {
         </button>
       </nav>
 
-      <div className="mx-auto w-full max-w-xl flex-1 px-5 pb-32 pt-5 lg:max-w-[1120px] lg:px-12 lg:pb-14 lg:pt-10">
+      <div className="mx-auto w-full max-w-xl flex-1 px-5 pb-32 pt-[calc(env(safe-area-inset-top)+20px)] lg:max-w-[1120px] lg:px-12 lg:pb-14 lg:pt-10">
         {tab === "control" && (
           <ControlTab
             codes={codes}

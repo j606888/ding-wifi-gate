@@ -440,7 +440,7 @@ function ActivationForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-ground px-5 pb-8 pt-3">
+      <div className="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-ground px-5 pb-[max(env(safe-area-inset-bottom),32px)] pt-3">
         {error && (
           <p role="alert" className="text-center text-sm text-danger">
             {error}

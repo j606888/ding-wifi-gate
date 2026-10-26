@@ -77,7 +77,7 @@ export function Sheet({
         aria-label={title}
         className="mx-auto flex h-full max-w-md flex-col overflow-y-auto lg:mx-0 lg:w-[440px] lg:max-w-none lg:border-l lg:border-line lg:bg-ground lg:shadow-2xl"
       >
-        <header className="grid grid-cols-[72px_1fr_72px] items-center px-3 pb-2 pt-3">
+        <header className="grid grid-cols-[72px_1fr_72px] items-center px-3 pb-2 pt-[calc(env(safe-area-inset-top)+12px)] lg:pt-3">
           <button onClick={onClose} className="h-11 px-2 text-left text-base">
             取消
           </button>

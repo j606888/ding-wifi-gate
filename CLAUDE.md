@@ -44,6 +44,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - [x] 權限管理：新用戶自動建立帳號，管理員手動開通 `is_active`
 - [x] LINE Rich Menu：快速開門/關門/停止按鈕
 - [x] 「誰來了」指令：顯示最新 5 筆開門紀錄（相對時間格式）
+- [x] 加入主畫面（不上 App Store）：manifest＋圖示、iOS 上後台控制頁提示「加到主畫面」＋教學、safe area、切回來自動重抓
 - [x] 密碼網頁開門：訪客在 `/` 輸入 6 位數密碼開門、顯示關門按鈕；管理員後台 `/admin` 設定密碼（標籤＋可用時間區間）並看使用次數。紀錄整合進「誰來了」＋ Bark 推播
 
 ## 待辦事項
@@ -100,13 +101,14 @@ ding-wifi-gate/
 │       └── main.ino       # ESP32 韌體：連 Wi-Fi + 訂閱 MQTT + 繼電器控制
 ├── app/
 │   ├── page.tsx           # 公開密碼開門頁（輸入密碼→開門→關門按鈕）
+│   ├── manifest.ts        # 加入主畫面用（沒設 start_url：從哪頁加就從哪頁開）
 │   ├── components/
 │   │   ├── GarageScene.tsx# 鐵捲門插畫＋動畫（5 秒捲上/下，門開 3 秒後小偷探頭）
 │   │   └── icons.tsx      # 線條圖示
 │   ├── admin/
 │   │   ├── page.tsx       # 後台（server component，驗 cookie）
 │   │   ├── AdminClient.tsx# 後台外框：手機底部導覽 控制 / 紀錄 / 管理；電腦版（lg 以上）左側選單
-│   │   ├── control/       # 控制分頁：遠端開/關/停，門狀態由最新紀錄推算
+│   │   ├── control/       # 控制分頁：遠端開/關/停，門狀態由最新紀錄推算；AddToHomeScreen 提示＋教學（只在 iOS 瀏覽器）
 │   │   └── login/page.tsx # 管理員登入頁
 │   └── api/
 │       ├── garage/route.ts        # POST /api/garage - 直接觸發（測試用）
@@ -141,7 +143,8 @@ ding-wifi-gate/
 ├── scripts/
 │   ├── schema.sql         # Supabase 資料表 DDL（可重複執行）
 │   ├── setup_rich_menu.sh # 建立「尚未綁定／已綁定」兩種 Rich Menu
-│   └── rich-menu/         # Rich Menu 圖片的 HTML 原稿 + render.sh（Chrome headless 截圖）
+│   ├── rich-menu/         # Rich Menu 圖片的 HTML 原稿 + render.sh（Chrome headless 截圖）
+│   └── app-icon/          # 主畫面圖示 HTML 原稿 + render.sh → public/apple-touch-icon.png、icon-192/512.png
 ├── public/
 │   └── line-rich-menu-{unbound,bound}.png # LINE Rich Menu 圖片（render.sh 產生）
 ├── .env.local             # 所有密碼（不進 git）
@@ -260,7 +263,7 @@ Better Auth 的表（欄位 camelCase，SQL 在 `scripts/schema.sql` 第 6 段�
   且現在落在區間內 → 發 MQTT `open`、寫 `access_logs`(source=web)、發 Bark 推播，回傳
   短效**關門 token**（HMAC 簽 `code_id`，最長 30 分或到密碼到期）。畫面顯示關門按鈕
   與「記得幫我關門」提醒；按關門 → `POST /api/door/close`（帶 token）發 MQTT `close`。
-- **後台 `/admin`**：用 `ADMIN_PASSWORD` 登入（HMAC 簽章 httpOnly cookie，7 天）。可
+- **後台 `/admin`**：用 `ADMIN_PASSWORD` 登入（HMAC 簽章 httpOnly cookie，30 天；主畫面 App 跟 Safari 不共用 cookie，要各登入一次）。可
   新增/停用/刪除密碼、看每組密碼成功開門次數。所有 `/api/admin/*` 都先 `requireAdmin`。
 - **訪客名字**：共用密碼多人在用時，`/` 會先請訪客填名字（只需填一次，存在手機
   localStorage）。名字送到 verify、簽進關門 token，紀錄與推播顯示成 `🔑 小明（週二 Bachata 課）`。

@@ -106,6 +106,14 @@ export const PlusIcon = (p: IconProps) => (
   </Icon>
 );
 
+// iOS 分享選單裡「加入主畫面」的圖示
+export const AddSquareIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="4" />
+    <path d="M12 8.5v7M8.5 12h7" />
+  </Icon>
+);
+
 export const GarageIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 21V8l9-5 9 5v13" />

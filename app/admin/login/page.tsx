@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-full flex-1 justify-center bg-ground">
-      <main className="flex w-full max-w-md flex-col gap-6 px-6 pb-8 pt-18">
+      <main className="flex w-full max-w-md flex-col gap-6 px-6 pb-8 pt-[calc(env(safe-area-inset-top)+72px)]">
         <div
           aria-hidden="true"
           className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink"

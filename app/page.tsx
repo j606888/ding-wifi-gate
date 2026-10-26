@@ -190,7 +190,7 @@ export default function DoorPage() {
   return (
     <div className="flex min-h-full flex-1 justify-center bg-ground lg:items-center lg:px-6 lg:py-12">
       {/* 手機一欄；電腦版左右兩欄：左邊標題＋鐵捲門，右邊操作 */}
-      <main className="flex w-full max-w-md flex-col gap-6 px-5 pb-8 pt-7 lg:max-w-[1040px] lg:flex-row lg:gap-0 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-line lg:bg-surface lg:p-0 lg:shadow-[0_12px_40px_rgba(26,27,30,0.06)]">
+      <main className="flex w-full max-w-md flex-col gap-6 px-5 pb-[max(env(safe-area-inset-bottom),32px)] pt-[calc(env(safe-area-inset-top)+28px)] lg:max-w-[1040px] lg:flex-row lg:gap-0 lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-line lg:bg-surface lg:p-0 lg:shadow-[0_12px_40px_rgba(26,27,30,0.06)]">
         <div className="flex flex-col gap-6 lg:w-1/2 lg:justify-between lg:gap-8 lg:bg-faded lg:p-10">
           <header className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-muted lg:text-sm">

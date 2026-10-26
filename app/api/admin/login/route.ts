@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, signToken } from "@/lib/auth";
 
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+// 30 天：加到主畫面後不用常常重新登入
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json().catch(() => ({ password: "" }));
