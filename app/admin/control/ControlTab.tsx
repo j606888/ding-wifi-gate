@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import GarageScene, { useDoorPhase, useThief } from "@/app/components/GarageScene";
-import { ArrowDownIcon, ArrowUpIcon, KeyIcon, StopIcon } from "@/app/components/icons";
+import { ArrowDownIcon, ArrowUpIcon, KeyIcon, RefreshIcon, StopIcon } from "@/app/components/icons";
 import { ACTION_LABEL, formatAccessTime, stripKeyPrefix } from "@/lib/access-format";
 import { codeStatus } from "@/lib/schedule";
 import type { LogRow } from "../logs/LogsTab";
 import { DoorCode, windowSummary } from "../shared";
 import { isDead, StatusChip } from "../codes/CodeCard";
+import AddToHomeScreen from "./AddToHomeScreen";
 
 type Action = "open" | "close" | "stop";
 
@@ -33,6 +34,7 @@ export default function ControlTab({
   const [sending, setSending] = useState<Action | null>(null);
   const [error, setError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [refreshing, setRefreshing] = useState(false);
 
   const door = useDoorPhase();
   const thief = useThief(door.phase, door.openedAt);
@@ -63,6 +65,24 @@ export default function ControlTab({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(true);
   }, [load]);
+
+  // 從主畫面打開時沒有網址列可以重新整理：切回來就重抓一次
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await load(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // 「門開著 X 分鐘了」每 30 秒更新
   useEffect(() => {
@@ -121,13 +141,29 @@ export default function ControlTab({
     warn = thief;
   }
 
-  // 電腦版三顆並排：門開著時「關門」變成黑底主要按鈕、「開門」退成外框（手機版維持開門在上）
+  // 門開著時「關門」變成黑底主要按鈕、「開門」退成外框。
+  // 手機：主要那顆放最上面整排；電腦版三顆並排、順序不變
   const doorUp = door.phase === "open" || door.phase === "opening";
+  const primaryCls =
+    "col-span-2 h-18 rounded-[18px] text-[22px] lg:col-span-1 lg:h-16 lg:text-[19px]";
+  const secondaryCls =
+    "h-15 rounded-2xl border-2 border-ink bg-surface text-lg lg:h-16 lg:rounded-[18px] lg:text-[19px]";
   const liveCodes = codes.filter((c) => !isDead(c, pageNowMs)).slice(0, 4);
 
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-6">
-      <h1 className="text-xl font-bold leading-[44px] lg:hidden">{GATE_NAME}</h1>
+      <div className="flex items-center justify-between lg:hidden">
+        <h1 className="text-xl font-bold leading-[44px]">{GATE_NAME}</h1>
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label="重新整理"
+          className="-mr-2.5 flex h-11 w-11 items-center justify-center text-subtle disabled:opacity-60"
+        >
+          <RefreshIcon size={22} strokeWidth={1.8} className={refreshing ? "animate-spin" : ""} />
+        </button>
+      </div>
+      <AddToHomeScreen />
       <div className="col-span-full mb-1 hidden lg:block">
         <h1 className="text-[32px] font-bold leading-[44px]">控制</h1>
         <p className="text-[15px] text-muted">門的狀態是用最新一筆紀錄推算的，沒有感測器</p>
@@ -167,19 +203,19 @@ export default function ControlTab({
           <button
             onClick={() => send("open")}
             disabled={sending !== null}
-            className={`col-span-2 flex h-18 items-center justify-center gap-2.5 rounded-[18px] bg-accent text-[22px] font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-45 lg:col-span-1 lg:h-16 lg:text-[19px] ${
+            className={`flex items-center justify-center gap-2.5 font-bold transition-colors disabled:opacity-45 ${
               doorUp
-                ? "lg:border-2 lg:border-ink lg:bg-surface lg:text-ink lg:hover:bg-ground"
-                : ""
+                ? `${secondaryCls} order-3 hover:bg-ground lg:order-none`
+                : `${primaryCls} bg-accent text-white hover:bg-accent-hover`
             }`}
           >
-            <ArrowUpIcon size={24} />
+            <ArrowUpIcon size={doorUp ? 20 : 24} />
             {sending === "open" ? "傳送中…" : "開門"}
           </button>
           <button
             onClick={() => send("stop")}
             disabled={sending !== null}
-            className="flex h-15 items-center justify-center gap-2 rounded-2xl border-2 border-ink bg-surface text-lg font-bold disabled:opacity-45 lg:h-16 lg:rounded-[18px] lg:text-[19px]"
+            className={`flex items-center justify-center gap-2 font-bold disabled:opacity-45 ${secondaryCls}`}
           >
             <StopIcon />
             {sending === "stop" ? "傳送中…" : "停止"}
@@ -187,11 +223,13 @@ export default function ControlTab({
           <button
             onClick={() => send("close")}
             disabled={sending !== null}
-            className={`flex h-15 items-center justify-center gap-2 rounded-2xl border-2 border-ink bg-surface text-lg font-bold disabled:opacity-45 lg:h-16 lg:rounded-[18px] lg:text-[19px] ${
-              doorUp ? "lg:border-0 lg:bg-ink lg:text-white" : ""
+            className={`flex items-center justify-center gap-2.5 font-bold transition-colors disabled:opacity-45 ${
+              doorUp
+                ? `${primaryCls} order-first bg-ink text-white lg:order-none`
+                : `${secondaryCls} hover:bg-ground`
             }`}
           >
-            <ArrowDownIcon />
+            <ArrowDownIcon size={doorUp ? 24 : 20} />
             {sending === "close" ? "傳送中…" : "關門"}
           </button>
         </div>

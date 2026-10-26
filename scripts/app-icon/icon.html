@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- 主畫面圖示原稿：跟登入頁的捲門 logo 同一個圖案。render.sh 截 512×512 再縮成各尺寸 -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 512px; height: 512px; overflow: hidden; background: #1a1b1e; }
+  body { display: flex; align-items: center; justify-content: center; }
+  /* 圖案放在中間 56%，Android 圓形遮罩（maskable）也裁不到 */
+  .door { width: 287px; display: flex; flex-direction: column; gap: 28px; }
+  .slat { height: 40px; border-radius: 8px; background: #f3f1ec; }
+  .bar { height: 26px; border-radius: 8px; background: #e8590c; }
+</style>
+</head>
+<body>
+  <div class="door">
+    <div class="slat"></div>
+    <div class="slat"></div>
+    <div class="slat"></div>
+    <div class="bar"></div>
+  </div>
+</body>
+</html>
