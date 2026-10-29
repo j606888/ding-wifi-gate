@@ -84,8 +84,9 @@ values ('home', '丁宅鐵捲門', 'home/garage')
 on conflict (slug) do nothing;
 
 -- 欄位預設值指向預設 gate：先跑 SQL、後部署程式也不會寫入失敗
+-- search_path 固定為空（Security Advisor「Function Search Path Mutable」），表名要寫 schema
 create or replace function default_gate_id() returns uuid
-language sql stable as $$ select id from gates where slug = 'home' $$;
+language sql stable set search_path = '' as $$ select id from public.gates where slug = 'home' $$;
 
 alter table door_codes       add column if not exists gate_id uuid references gates(id) on delete cascade;
 alter table access_logs      add column if not exists gate_id uuid references gates(id) on delete cascade;
@@ -125,6 +126,9 @@ alter table auth_verifications enable row level security;
 alter table gates              enable row level security;
 alter table access_logs        enable row level security;
 alter table users              enable row level security;
+alter table door_codes         enable row level security;
+alter table door_attempts      enable row level security;
+alter table activation_codes   enable row level security;
 
 -- 把自己設成管理員（換成你的 LINE userId，可在 users 表找到）
 -- update users set is_admin = true where line_user_id = 'Uxxxxxxxx';
