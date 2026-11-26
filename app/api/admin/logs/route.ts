@@ -5,7 +5,7 @@ import { getDefaultGate } from "@/lib/gates";
 
 const ACTIONS = ["open", "close", "stop"];
 const STATUSES = ["success", "denied"];
-const SOURCES = ["line", "web"];
+const SOURCES = ["line", "web", "watch"];
 
 export async function GET(req: NextRequest) {
   if (!requireAdmin(req, Date.now())) {

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { publishMQTT } from "@/lib/mqtt";
-import { logAccess, notifyBark } from "@/lib/access";
-import { signToken } from "@/lib/auth";
+import { triggerDoor } from "@/lib/door";
+import { clientIp, signToken } from "@/lib/auth";
 import { getDefaultGate } from "@/lib/gates";
 import { evaluateCode } from "@/lib/schedule";
 import { windowSummary } from "@/lib/code-format";
@@ -11,12 +10,6 @@ import { cleanGuestName, guestDisplayName } from "@/lib/guest-name";
 const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 分鐘
 const RATE_MAX_FAILS = 10; // 同 IP 10 分鐘內最多 10 次失敗
 const CLOSE_TOKEN_TTL_MS = 30 * 60 * 1000; // 關門 token 最長 30 分鐘
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
-}
 
 export async function POST(req: NextRequest) {
   const now = Date.now();
@@ -92,22 +85,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 開門
+  const displayName = guestDisplayName(codeRow.label, name);
   try {
-    await publishMQTT(gate, "open");
+    await triggerDoor({
+      gate,
+      action: "open",
+      displayName,
+      source: "web",
+      codeId: codeRow.id,
+    });
   } catch {
     return NextResponse.json({ error: "發送失敗，請稍後再試" }, { status: 502 });
   }
-
-  const displayName = guestDisplayName(codeRow.label, name);
-  await logAccess({
-    gateId: gate.id,
-    action: "open",
-    status: "success",
-    displayName,
-    source: "web",
-    codeId: codeRow.id,
-  });
-  await notifyBark(displayName, "open").catch(() => {});
 
   // 關門 token：min(30 分, 本次時段結束時間)
   const ttl = Math.max(0, Math.min(CLOSE_TOKEN_TTL_MS, windowEndMs - now));

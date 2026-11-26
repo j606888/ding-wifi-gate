@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { publishMQTT, type GarageAction } from "@/lib/mqtt";
-import { logAccess, notifyBark } from "@/lib/access";
+import type { GarageAction } from "@/lib/mqtt";
+import { triggerDoor } from "@/lib/door";
 import { verifyToken } from "@/lib/auth";
 import { getDefaultGate, getGateById } from "@/lib/gates";
 import { cleanGuestName, guestDisplayName } from "@/lib/guest-name";
@@ -36,20 +36,10 @@ export async function POST(req: NextRequest) {
   const displayName = guestDisplayName(label, cleanGuestName(payload.name));
 
   try {
-    await publishMQTT(gate, action);
+    await triggerDoor({ gate, action, displayName, source: "web", codeId });
   } catch {
     return NextResponse.json({ error: "發送失敗，請稍後再試" }, { status: 502 });
   }
-
-  await logAccess({
-    gateId: gate.id,
-    action,
-    status: "success",
-    displayName,
-    source: "web",
-    codeId,
-  });
-  notifyBark(displayName, action).catch(() => {});
 
   return NextResponse.json({ status: "ok" });
 }
