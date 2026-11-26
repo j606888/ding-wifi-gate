@@ -35,7 +35,6 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 
 - [x] ESP32 燒錄韌體，連上 Wi-Fi
 - [x] ESP32 訂閱 HiveMQ MQTT（`home/garage` topic）
-- [x] Next.js API Route `POST /api/garage`（直接發 MQTT，測試用）
 - [x] Next.js LINE Webhook `POST /api/webhook`（驗證簽名、解析指令、發 MQTT、回覆用戶）
 - [x] LINE Bot 傳「開門/關門/停」→ ESP32 LED 閃動（全鏈路驗證成功）
 - [x] 部署 Vercel（`https://ding-wifi-gate.vercel.app/api/webhook`），LINE Webhook 驗證成功
@@ -46,6 +45,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - [x] 「誰來了」指令：顯示最新 5 筆開門紀錄（相對時間格式）
 - [x] 加入主畫面（不上 App Store）：manifest＋圖示、iOS 上後台控制頁提示「加到主畫面」＋教學、safe area、切回來自動重抓
 - [x] 密碼網頁開門：訪客在 `/` 輸入 6 位數密碼開門、顯示關門按鈕；管理員後台 `/admin` 設定密碼（標籤＋可用時間區間）並看使用次數。紀錄整合進「誰來了」＋ Bark 推播
+- [ ] Apple Watch 捷徑開門：`POST /api/door/open`（Bearer token，10 秒冷卻，回一行純文字）
 
 ## 待辦事項
 
@@ -90,6 +90,7 @@ ESP32（家裡，長連線訂閱 home/garage topic）
 - `DATABASE_URL`（Supabase pooler transaction mode，port 6543；Better Auth 直連 Postgres 用）
 - `BETTER_AUTH_SECRET`（App 帳號 session 簽章）/ `BETTER_AUTH_URL`（正式站網址）
 - `APPLE_CLIENT_ID`（Services ID）/ `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY`（換行存成 `\n`）/ `APPLE_APP_BUNDLE_IDENTIFIER`：Sign in with Apple，沒設就只有 Email 登入
+- `SHORTCUT_TOKENS`（手錶捷徑開門的 Bearer token，格式 `名字:token,名字:token`；名字會顯示成紀錄的 `⌚ 名字`。產生：`openssl rand -base64 32`）
 - `LINE_ADD_FRIEND_URL`（選填，LINE 加好友連結，放進啟動碼的分享訊息）
 
 ## 檔案結構
@@ -111,11 +112,11 @@ ding-wifi-gate/
 │   │   ├── control/       # 控制分頁：遠端開/關/停，門狀態由最新紀錄推算；AddToHomeScreen 提示＋教學（只在 iOS 瀏覽器）
 │   │   └── login/page.tsx # 管理員登入頁
 │   └── api/
-│       ├── garage/route.ts        # POST /api/garage - 直接觸發（測試用）
 │       ├── webhook/route.ts       # POST /api/webhook - LINE Bot 入口
 │       ├── auth/[...all]/route.ts # Better Auth（註冊、登入、Apple callback、App idToken 登入）
 │       ├── app/v1/account/route.ts # GET 我的帳號 / DELETE 刪除帳號（iOS App，Bearer token）
 │       ├── door/
+│       │   ├── open/route.ts      # POST - Apple Watch 捷徑開門（Bearer token，回純文字）
 │       │   ├── verify/route.ts    # POST - 驗密碼＋開門，回關門 token
 │       │   └── close/route.ts     # POST - 用 token 關門或緊急停止（action: close/stop）
 │       └── admin/
@@ -129,7 +130,8 @@ ding-wifi-gate/
 │               └── [id]/route.ts  # PATCH 編輯/停用 / DELETE 刪除
 ├── lib/
 │   ├── supabase.ts        # Supabase client
-│   ├── mqtt.ts            # publishMQTT(gate, action)（共用）
+│   ├── mqtt.ts            # publishMQTT(gate, action)（5 秒逾時）
+│   ├── door.ts            # triggerDoor：發 MQTT，after() 寫紀錄＋Bark（所有開關門都走這裡）
 │   ├── gates.ts           # getDefaultGate / getGateById（多租戶的門）
 │   ├── db.ts              # pg Pool（DATABASE_URL，給 Better Auth）
 │   ├── user-auth.ts       # Better Auth：Email／密碼 + Sign in with Apple + bearer（App 帳號）
@@ -139,7 +141,7 @@ ding-wifi-gate/
 │   ├── access.ts          # logAccess / notifyBark / sendBark / ACTION_LABEL（共用）
 │   ├── line.ts            # LINE 回覆/推播/個人資料/個人 Rich Menu 切換
 │   ├── members.ts         # 開通、停用、申請、啟動碼兌換（webhook 與後台共用）
-│   └── auth.ts            # HMAC signToken/verifyToken / requireAdmin
+│   └── auth.ts            # HMAC signToken/verifyToken / requireAdmin / matchShortcutToken / clientIp
 ├── scripts/
 │   ├── schema.sql         # Supabase 資料表 DDL（可重複執行）
 │   ├── setup_rich_menu.sh # 建立「尚未綁定／已綁定」兩種 Rich Menu
@@ -218,7 +220,7 @@ Better Auth 的表（欄位 camelCase，SQL 在 `scripts/schema.sql` 第 6 段�
 | `display_name` | text | 操作者名稱（快照；網頁開門為 `🔑 標籤`） |
 | `action` | text | `open` / `close` / `stop` |
 | `status` | text | `success` / `denied` |
-| `source` | text | `line` / `web`（預設 `line`） |
+| `source` | text | `line` / `web` / `watch`（預設 `line`） |
 | `code_id` | int (nullable) | 網頁開門對應的 `door_codes.id` |
 | `created_at` | timestamptz | 操作時間 |
 
@@ -269,6 +271,14 @@ Better Auth 的表（欄位 camelCase，SQL 在 `scripts/schema.sql` 第 6 段�
   localStorage）。名字送到 verify、簽進關門 token，紀錄與推播顯示成 `🔑 小明（週二 Bachata 課）`。
   名字是自填的，只用來分辨熟人，不是身分驗證。
 - 安全：6 位數字靠「時間區間 + IP 速率限制」降風險；關門 token 過期需重新輸密碼。
+
+## Apple Watch 捷徑開門
+
+- 捷徑 App「取得 URL 的內容」直接打 `POST /api/door/open`，標頭 `Authorization: Bearer <token>`。手錶自己跑捷徑（網路經過 iPhone），不用叫醒任何 App。
+- 只能開門，不做關門（看不到門下，誤關危險）。
+- 10 秒內任何來源開過門就回 `冷卻中，請稍後`（查 `access_logs`）。驗證失敗記在 `door_attempts`（`ip` 存 `watch:<ip>`），同 IP 10 分鐘 10 次回 429。
+- 回應：`已開門` / `冷卻中，請稍後` / `驗證失敗` / `嘗試太多次` / `發送失敗，請再試一次`（失敗也發 Bark）。
+- 「已開門」代表 HiveMQ 收到了，不保證 ESP32 收到（ESP32 沒有回報）。
 
 ## LINE 指令對應
 

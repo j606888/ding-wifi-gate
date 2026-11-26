@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as crypto from "crypto";
 import { supabase } from "@/lib/supabase";
-import { publishMQTT } from "@/lib/mqtt";
+import type { GarageAction } from "@/lib/mqtt";
+import { triggerDoor } from "@/lib/door";
 import { getDefaultGate } from "@/lib/gates";
 import {
   ACTION_LABEL,
   formatAccessTime,
   logAccess,
-  notifyBark,
   sendBark,
 } from "@/lib/access";
 import { getLineProfile, replyMessage, replyMessages, setBoundRichMenu } from "@/lib/line";
@@ -180,10 +180,14 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await publishMQTT(gate, action);
-      await logAccess({ gateId: gate.id, lineUserId, displayName, action, status: "success" });
+      await triggerDoor({
+        gate,
+        action: action as GarageAction,
+        displayName,
+        source: "line",
+        lineUserId,
+      });
       await replyMessage(event.replyToken, `${LABEL_MAP[text]}成功`);
-      await notifyBark(displayName, action).catch(() => {});
     } catch {
       await replyMessage(event.replyToken, "發送失敗，請稍後再試");
     }

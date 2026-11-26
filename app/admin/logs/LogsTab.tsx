@@ -11,17 +11,18 @@ export type LogRow = {
   display_name: string;
   action: string;
   status: "success" | "denied";
-  source: "line" | "web";
+  source: "line" | "web" | "watch";
   code_id: number | null;
   created_at: string;
 };
 
-type Filter = "all" | "line" | "web" | "denied";
+type Filter = "all" | "line" | "web" | "watch" | "denied";
 
 const FILTERS: { key: Filter; label: string; query: string }[] = [
   { key: "all", label: "全部", query: "" },
   { key: "line", label: "LINE", query: "source=line" },
   { key: "web", label: "網頁", query: "source=web" },
+  { key: "watch", label: "手錶", query: "source=watch" },
   { key: "denied", label: "被拒絕", query: "status=denied" },
 ];
 
@@ -48,6 +49,7 @@ function dayHeading(ms: number, nowMs: number): string {
 
 function sourceBadge(log: LogRow): string {
   if (log.source === "line") return "LINE";
+  if (log.source === "watch") return "手錶";
   return log.code_id != null ? "密碼" : "後台";
 }
 

@@ -4,12 +4,14 @@ import { ACTION_LABEL } from "@/lib/access-format";
 // 為了相容既有 server 端 import（webhook 等），從 client-safe 模組 re-export。
 export { ACTION_LABEL, formatAccessTime } from "@/lib/access-format";
 
+export type AccessSource = "line" | "web" | "watch";
+
 type LogAccessParams = {
   gateId: string;
   action: string;
   status: "success" | "denied";
   displayName: string;
-  source?: "line" | "web";
+  source?: AccessSource;
   lineUserId?: string | null;
   codeId?: number | null;
 };
