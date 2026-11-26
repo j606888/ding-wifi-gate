@@ -157,3 +157,10 @@ export const UsersIcon = (p: IconProps) => (
     <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6" />
   </Icon>
 );
+
+export const WatchIcon = (p: IconProps) => (
+  <Icon strokeWidth={1.8} {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="3" />
+    <path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 10v2.2l1.5 1" />
+  </Icon>
+);

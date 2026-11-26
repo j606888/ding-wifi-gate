@@ -36,13 +36,17 @@ export async function triggerDoor(params: TriggerDoorParams): Promise<void> {
   });
 }
 
-/** 這扇門在最近 windowMs 內有沒有成功開過（任何來源都算）。 */
-export async function openedRecently(gateId: string, windowMs: number): Promise<boolean> {
+/** 這扇門在最近 windowMs 內有沒有成功做過這個動作（任何來源都算）。 */
+export async function actedRecently(
+  gateId: string,
+  action: GarageAction,
+  windowMs: number
+): Promise<boolean> {
   const { count } = await supabase
     .from("access_logs")
     .select("id", { count: "exact", head: true })
     .eq("gate_id", gateId)
-    .eq("action", "open")
+    .eq("action", action)
     .eq("status", "success")
     .gte("created_at", new Date(Date.now() - windowMs).toISOString());
   return (count ?? 0) > 0;
