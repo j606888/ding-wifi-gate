@@ -8,6 +8,7 @@ import CodesTab from "./codes/CodesTab";
 import CalendarTab from "./calendar/CalendarTab";
 import LogsTab from "./logs/LogsTab";
 import MembersTab from "./members/MembersTab";
+import WatchTab from "./watch/WatchTab";
 import { isPending, type ActivationCode, type Member } from "./members/format";
 import {
   CalendarIcon,
@@ -17,12 +18,13 @@ import {
   LogoutIcon,
   SlidersIcon,
   UsersIcon,
+  WatchIcon,
 } from "@/app/components/icons";
 
-// 手機：底部導覽 控制 / 紀錄 / 管理（管理裡再切 訪客密碼 / LINE 成員 / 日曆）
-// 電腦（lg 以上）：左側選單直接列出五個頁面
-type Tab = "control" | "logs" | "codes" | "members" | "calendar";
-type ManageTab = "codes" | "members" | "calendar";
+// 手機：底部導覽 控制 / 紀錄 / 管理（管理裡再切 訪客密碼 / LINE 成員 / 手錶 / 日曆）
+// 電腦（lg 以上）：左側選單直接列出六個頁面
+type Tab = "control" | "logs" | "codes" | "members" | "watch" | "calendar";
+type ManageTab = "codes" | "members" | "watch" | "calendar";
 
 const GATE_NAME = "丁宅鐵捲門";
 
@@ -37,17 +39,19 @@ const SIDEBAR_TABS: { key: Tab; label: string; Icon: typeof GarageIcon }[] = [
   { key: "logs", label: "紀錄", Icon: ClockIcon },
   { key: "codes", label: "訪客密碼", Icon: KeyIcon },
   { key: "members", label: "LINE 成員", Icon: UsersIcon },
+  { key: "watch", label: "手錶", Icon: WatchIcon },
   { key: "calendar", label: "日曆", Icon: CalendarIcon },
 ];
 
 const MANAGE_TABS: { key: ManageTab; label: string }[] = [
   { key: "codes", label: "訪客密碼" },
   { key: "members", label: "LINE 成員" },
+  { key: "watch", label: "手錶" },
   { key: "calendar", label: "日曆" },
 ];
 
 const isManage = (t: Tab): t is ManageTab =>
-  t === "codes" || t === "members" || t === "calendar";
+  t === "codes" || t === "members" || t === "watch" || t === "calendar";
 
 export default function AdminClient() {
   const router = useRouter();
@@ -225,7 +229,7 @@ export default function AdminClient() {
                   登出
                 </button>
               </div>
-              <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-sunken p-1">
+              <div className="mb-4 grid grid-cols-4 gap-1 rounded-xl bg-sunken p-1">
                 {MANAGE_TABS.map((t) => (
                   <button
                     key={t.key}
@@ -263,6 +267,7 @@ export default function AdminClient() {
                 showToast={showToast}
               />
             )}
+            {tab === "watch" && <WatchTab showToast={showToast} />}
             {tab === "calendar" && (
               <>
                 <h1 className="mb-6 hidden text-[32px] font-bold leading-[44px] lg:block">日曆</h1>

@@ -130,6 +130,22 @@ alter table door_codes         enable row level security;
 alter table door_attempts      enable row level security;
 alter table activation_codes   enable row level security;
 
+-- 8) Apple Watch 捷徑 token（後台「手錶」分頁管理，lib/watch-tokens.ts）
+--    只存 SHA-256，明文只在建立／刷新時顯示一次
+create table if not exists watch_tokens (
+  id           bigint generated always as identity primary key,
+  gate_id      uuid        not null default default_gate_id() references gates(id) on delete cascade,
+  name         text        not null,               -- 誰在用，紀錄顯示成「⌚ 名字」
+  token_hash   text        not null unique,        -- sha256(token) hex
+  token_hint   text        not null,               -- 末 4 碼，後台辨識用
+  can_close    boolean     not null default true,
+  last_used_at timestamptz,
+  revoked_at   timestamptz,                        -- 刪除（紀錄保留）
+  created_at   timestamptz not null default now()
+);
+create index if not exists watch_tokens_gate_idx on watch_tokens (gate_id, created_at desc);
+alter table watch_tokens enable row level security;
+
 -- 把自己設成管理員（換成你的 LINE userId，可在 users 表找到）
 -- update users set is_admin = true where line_user_id = 'Uxxxxxxxx';
 
